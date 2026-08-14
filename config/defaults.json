@@ -1,0 +1,26 @@
+{
+  "global": {
+    "wrongAnswerPolicy": "STEAL",
+    "excludeUsedQuestions": true,
+    "verifiedOnly": true,
+    "questionOrder": "random",
+    "allowUndo": true
+  },
+  "features": {
+    "tabooGame": false
+  },
+  "games": {
+    "person_quiz": { "roundDurationSec": 60, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "HOST_DECIDES" },
+    "music_intro": { "stageDurationSec": 5, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "charades": { "roundDurationSec": 60, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "HOST_DECIDES" },
+    "four_syllable": { "roundDurationSec": 60, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "HOST_DECIDES" },
+    "three_in_time": { "questionDurationSec": 5, "requiredCount": 3, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "HOST_DECIDES" },
+    "zoom_image": { "stageDurationSec": 10, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "logo_quiz": { "questionDurationSec": 20, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "movie_poster": { "questionDurationSec": 20, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "progressive_hint": { "stageDurationSec": 15, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "song_drawing": { "stageDurationSec": 15, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "taboo": { "roundDurationSec": 60, "previewDurationSec": 5, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "HOST_DECIDES" },
+    "football_career": { "stageDurationSec": 20, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" }
+  }
+}
