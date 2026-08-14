@@ -171,7 +171,7 @@ export const useSessionStore = create<SessionStore>()(
             : [...state.selectedGameIds, gameId],
         })),
       selectGame: (gameId) =>
-        set({ currentGameId: gameId, screen: "game_setup", history: [] }),
+        set({ currentGameId: gameId, screen: "game_intro", history: [] }),
       selectTeam: (teamId) => set({ currentTeamId: teamId }),
       updateSettings: (gameId, updates) =>
         set((state) => ({

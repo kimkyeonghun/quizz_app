@@ -20,4 +20,13 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "새 게임 시작" }));
     expect(screen.getByRole("heading", { name: "팀 설정" })).toBeInTheDocument();
   });
+
+  it("선택한 게임의 진행 방식과 채점 안내를 표시한다", () => {
+    useSessionStore.setState({ currentGameId: "charades", screen: "game_intro" });
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "몸으로 말해요" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "진행 순서" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "채점 방식" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "게임 설정" })).toBeInTheDocument();
+  });
 });

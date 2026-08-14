@@ -7,7 +7,9 @@ test("팀 설정부터 게임 판정과 Undo까지 진행한다", async ({ page 
   await page.getByRole("button", { name: "게임 선택" }).click();
 
   const charadesCard = page.locator("article").filter({ hasText: "몸으로 말해요" });
-  await charadesCard.getByRole("button", { name: "설정 열기" }).click();
+  await charadesCard.getByRole("button", { name: "게임 안내" }).click();
+  await expect(page.getByRole("heading", { name: "진행 순서" })).toBeVisible();
+  await page.getByRole("button", { name: "게임 설정" }).click();
   await expect(page.getByText(/개 문제 사용 가능/)).toBeVisible();
   await page.getByRole("button", { name: "라운드 시작" }).click();
 

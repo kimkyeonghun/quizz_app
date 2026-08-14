@@ -1,10 +1,13 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import {
   ArrowLeft,
+  BookOpen,
   Check,
   Expand,
   Eye,
   Flag,
+  Lightbulb,
+  ListChecks,
   Pause,
   Play,
   RotateCcw,
@@ -54,6 +57,7 @@ function App() {
       {screen === "home" && <HomeScreen />}
       {screen === "session_setup" && <SessionSetupScreen />}
       {screen === "game_select" && <GameSelectScreen />}
+      {screen === "game_intro" && <GameIntroScreen />}
       {screen === "game_setup" && <GameSetupScreen />}
       {screen === "game_play" && <GamePlayScreen />}
       {screen === "round_result" && <RoundResultScreen />}
@@ -198,11 +202,11 @@ function GameSelectScreen() {
               </div>
               <ActionButton
                 variant="primary"
-                icon={<Settings size={19} />}
+                icon={<BookOpen size={19} />}
                 disabled={!selected}
                 onClick={() => selectGame(game.id)}
               >
-                설정 열기
+                게임 안내
               </ActionButton>
             </article>
           );
@@ -211,6 +215,52 @@ function GameSelectScreen() {
       <footer className="screen-footer">
         <ActionButton icon={<Users size={20} />} onClick={() => setScreen("session_setup")}>팀 수정</ActionButton>
         <ActionButton icon={<Trophy size={20} />} onClick={() => setScreen("scoreboard")}>점수판</ActionButton>
+      </footer>
+    </ScreenFrame>
+  );
+}
+
+function GameIntroScreen() {
+  const currentGameId = useSessionStore((state) => state.currentGameId);
+  const setScreen = useSessionStore((state) => state.setScreen);
+
+  if (!currentGameId) return null;
+  const game = gameRegistry[currentGameId];
+
+  return (
+    <ScreenFrame title={game.label} subtitle="게임을 시작하기 전에 진행 방식을 확인하세요.">
+      <section className="game-guide" style={{ "--guide-accent": game.accent } as React.CSSProperties}>
+        <div className="guide-objective">
+          <span>어떤 게임인가요?</span>
+          <strong>{game.guide.objective}</strong>
+        </div>
+
+        <div className="guide-flow">
+          <h2><ListChecks size={22} /> 진행 순서</h2>
+          <ol className="guide-steps">
+            {game.guide.steps.map((step, index) => (
+              <li key={step}>
+                <span>{index + 1}</span>
+                <p>{step}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <div className="guide-details">
+          <section>
+            <h2><Trophy size={22} /> 채점 방식</h2>
+            <ul>{game.guide.scoring.map((rule) => <li key={rule}>{rule}</li>)}</ul>
+          </section>
+          <section>
+            <h2><Lightbulb size={22} /> 진행자 팁</h2>
+            <ul>{game.guide.hostTips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
+          </section>
+        </div>
+      </section>
+      <footer className="screen-footer">
+        <ActionButton icon={<ArrowLeft size={20} />} onClick={() => setScreen("game_select")}>게임 목록</ActionButton>
+        <ActionButton variant="primary" icon={<Settings size={20} />} onClick={() => setScreen("game_setup")}>게임 설정</ActionButton>
       </footer>
     </ScreenFrame>
   );
@@ -272,6 +322,7 @@ function GameSetupScreen() {
       </section>
       <footer className="screen-footer">
         <ActionButton icon={<ArrowLeft size={20} />} onClick={() => setScreen("game_select")}>게임 목록</ActionButton>
+        <ActionButton icon={<BookOpen size={20} />} onClick={() => setScreen("game_intro")}>게임 안내</ActionButton>
         <ActionButton
           variant="primary"
           icon={<Play size={20} />}

@@ -36,6 +36,7 @@ export type AppScreen =
   | "home"
   | "session_setup"
   | "game_select"
+  | "game_intro"
   | "game_setup"
   | "game_play"
   | "round_result"
@@ -162,4 +163,10 @@ export interface GameDefinition {
   engine: EngineType;
   accent: string;
   defaultSettings: GameSettings;
+  guide: {
+    objective: string;
+    steps: string[];
+    scoring: string[];
+    hostTips: string[];
+  };
 }
