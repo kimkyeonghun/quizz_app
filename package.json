@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "validate:data": "tsx scripts/validate-data.ts",
-    "data:report": "tsx scripts/data-report.ts"
+    "data:report": "tsx scripts/data-report.ts",
+    "seed:private-people": "node scripts/seed-private-person-content.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

@@ -5,3 +5,9 @@ test-results/
 coverage/
 *.tsbuildinfo
 .vite-dev*.log
+
+# 모든 문제 데이터는 이 PC에만 보관합니다.
+/data/
+
+# 다운로드한 이미지 등 public 런타임 에셋도 이 PC에만 보관합니다.
+/public/

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 import type { MvpQuestion } from "../src/domain/types";
+import { MVP_GAME_TYPES } from "../src/domain/types";
 import { questionSchema } from "../src/data/schema";
 
 export interface DataIssue {
@@ -34,6 +35,7 @@ export function scanData(projectRoot = resolve(import.meta.dirname, "..")): Data
   const issues: DataIssue[] = [];
   const ids = new Map<string, string>();
   const fingerprints = new Map<string, string>();
+  const fourSyllablePrompts = new Map<string, string>();
 
   for (const filePath of files) {
     const file = relative(projectRoot, filePath);
@@ -91,21 +93,43 @@ export function scanData(projectRoot = resolve(import.meta.dirname, "..")): Data
         if (!existsSync(assetPath)) issues.push({ file, index, message: `에셋 파일 없음: ${question.asset}` });
       }
 
-      if (question.gameType === "four_syllable" && `${question.metadata.prompt}${question.answer}` !== question.metadata.fullAnswer) {
-        issues.push({ file, index, message: "prompt + answer가 fullAnswer와 일치하지 않습니다." });
+      if (question.gameType === "four_syllable") {
+        const compactPrompt = question.metadata.prompt.replace(/\s/g, "");
+        const compactAnswer = question.answer.replace(/\s/g, "");
+        if (`${question.metadata.prompt}${question.answer}` !== question.metadata.fullAnswer) issues.push({ file, index, message: "prompt + answer가 fullAnswer와 일치하지 않습니다." });
+        if ([...compactPrompt].length !== 2 || [...compactAnswer].length !== 2) issues.push({ file, index, message: "prompt와 answer는 각각 2음절이어야 합니다." });
+        const existingPrompt = fourSyllablePrompts.get(normalize(compactPrompt));
+        if (existingPrompt) issues.push({ file, index, message: `동일 앞말 중복 (기존: ${existingPrompt})` });
+        else fourSyllablePrompts.set(normalize(compactPrompt), `${file}[${index}]`);
+      }
+
+      if (question.gameType === "three_in_time") {
+        if (new Set(question.metadata.examples.map(normalize)).size !== question.metadata.examples.length) issues.push({ file, index, message: "판정 예시에 중복이 있습니다." });
       }
 
       if (question.gameType === "football_career") {
         question.metadata.career.forEach((entry, careerIndex) => {
           if (entry.order !== careerIndex + 1) issues.push({ file, index, message: "career order는 1부터 순차 증가해야 합니다." });
         });
-        const maxIndex = question.metadata.career.length - 1;
-        question.metadata.revealStages.flat().forEach((stageIndex) => {
-          if (stageIndex > maxIndex) issues.push({ file, index, message: `잘못된 reveal stage index: ${stageIndex}` });
-        });
+        if (!question.sources?.length) issues.push({ file, index, message: "선수 커리어에는 검증 출처가 필요합니다." });
       }
     });
   }
+
+  for (const gameType of MVP_GAME_TYPES) {
+    const gameQuestions = questions.filter((question) => question.gameType === gameType);
+    if (gameQuestions.length < 100) issues.push({ file: "data", message: `${gameType}: 최소 100문항이어야 합니다. (현재 ${gameQuestions.length})` });
+    if (gameQuestions.some((question) => !question.enabled || !question.verified)) issues.push({ file: "data", message: `${gameType}: 모든 문항이 활성·검증 상태여야 합니다.` });
+    const boundaries = [0, 0.2, 0.45, 0.75, 0.95, 1].map((ratio) => Math.floor(gameQuestions.length * ratio));
+    const expectedDifficulty = boundaries.slice(0, 5).map((start, index) => boundaries[index + 1] - start);
+    expectedDifficulty.forEach((expected, difficultyIndex) => {
+      const actual = gameQuestions.filter((question) => question.difficulty === difficultyIndex + 1).length;
+      if (actual !== expected) issues.push({ file: "data", message: `${gameType}: 난이도 ${difficultyIndex + 1}은 ${expected}문항이어야 합니다. (현재 ${actual})` });
+    });
+  }
+
+  const people = questions.filter((question) => question.gameType === "person_quiz");
+  if (people.some((question) => !question.asset || !question.attribution || !question.sources?.length)) issues.push({ file: "data", message: "모든 인물 문항에는 로컬 이미지·라이선스·출처가 필요합니다." });
 
   return { questions, issues, files };
 }

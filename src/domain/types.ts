@@ -30,10 +30,14 @@ export type WrongAnswerPolicy =
   | "STEAL"
   | "RETRY_SAME_TEAM"
   | "END_QUESTION"
-  | "HOST_DECIDES";
+  | "HOST_DECIDES"
+  | "LOCK_CURRENT_STAGE";
+
+export type GameplayPhase = "ready" | "preview" | "active" | "attempt" | "revealed";
 
 export type AppScreen =
   | "home"
+  | "data_admin"
   | "session_setup"
   | "game_select"
   | "game_intro"
@@ -59,10 +63,13 @@ export interface FilterSettings {
   tags: string[];
   verifiedOnly: boolean;
   excludeUsedQuestions: boolean;
+  includePrivateQuestions: boolean;
   questionOrder: "random" | "data";
 }
 
 export interface GameSettings {
+  answerMode?: "host" | "direct_input";
+  roundQuestionCount?: number;
   roundDurationSec?: number;
   questionDurationSec?: number;
   stageDurationSec?: number;
@@ -70,9 +77,26 @@ export interface GameSettings {
   scorePerCorrect?: number;
   scoreOnSuccess?: number;
   stageScores?: number[];
+  stageCount?: number;
   requiredCount?: number;
   allowPass?: boolean;
   wrongAnswerPolicy: WrongAnswerPolicy;
+}
+
+export interface ContentSource {
+  title: string;
+  publisher: string;
+  url: string;
+  accessedAt: string;
+}
+
+export interface AssetAttribution {
+  author: string;
+  sourceUrl: string;
+  license: "CC0" | "PDM" | "CC BY 2.0" | "CC BY 3.0" | "CC BY 4.0" | "CC BY-SA 3.0" | "CC BY-SA 4.0" | "PRIVATE LOCAL USE";
+  licenseUrl?: string;
+  modified: string;
+  accessedAt: string;
 }
 
 export interface BaseQuestion {
@@ -86,9 +110,12 @@ export interface BaseQuestion {
   difficulty: 1 | 2 | 3 | 4 | 5;
   enabled: boolean;
   verified: boolean;
+  usageScope?: "redistributable" | "private_only";
   asset?: string | null;
   metadata?: Record<string, unknown>;
   source?: string | null;
+  sources?: ContentSource[];
+  attribution?: AssetAttribution;
   notes?: string;
   createdAt?: string;
   version?: number;
@@ -114,7 +141,13 @@ export interface FourSyllableQuestion extends BaseQuestion {
 export interface ThreeInTimeQuestion extends BaseQuestion {
   gameType: "three_in_time";
   answer: null;
-  metadata: { prompt: string; requiredCount: number; validationMode: "host" };
+  metadata: {
+    prompt: string;
+    requiredCount: number;
+    validationMode: "host";
+    examples: string[];
+    judgingNotes: string;
+  };
 }
 
 export interface ProgressiveHintQuestion extends BaseQuestion {
@@ -128,7 +161,6 @@ export interface FootballCareerQuestion extends BaseQuestion {
   answer: string;
   metadata: {
     career: Array<{ club: string; order: number }>;
-    revealStages: number[][];
     verifiedAt: string;
   };
 }
@@ -145,8 +177,9 @@ export type HostAction =
   | { type: "START" }
   | { type: "PAUSE" }
   | { type: "RESUME" }
+  | { type: "ATTEMPT"; teamId: string }
   | { type: "CORRECT"; teamId: string }
-  | { type: "WRONG" }
+  | { type: "WRONG"; teamId?: string }
   | { type: "PASS" }
   | { type: "STEAL"; teamId: string }
   | { type: "RETRY" }

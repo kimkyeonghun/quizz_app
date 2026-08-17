@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# 퀴즈 데이터나 로컬 에셋이 원격 저장소로 전송되는 것을 막습니다.
+# .gitignore를 우회해 강제로 추가한 경우도 검사합니다.
+
+set -eu
+
+remote_name=${1:-origin}
+zero_oid=0000000000000000000000000000000000000000
+blocked=0
+
+check_commit() {
+  commit=$1
+
+  paths=$(git diff-tree --root --no-commit-id --name-only -r "$commit")
+
+  for path in $paths; do
+    # 삭제 커밋은 허용합니다. 해당 커밋의 트리에 실제 파일이 남아 있을 때만 차단합니다.
+    if ! git cat-file -e "$commit:$path" 2>/dev/null; then
+      continue
+    fi
+
+    case "$path" in
+      data/*)
+        printf '%s\n' "[push 차단] 커밋 $commit 에 문제 데이터가 포함되어 있습니다: $path" >&2
+        blocked=1
+        ;;
+      public/assets/*/private/*|public/assets/*/local/*|public/assets/*.avif|public/assets/*.gif|public/assets/*.jpg|public/assets/*.jpeg|public/assets/*.png|public/assets/*.webp|public/assets/*/*.avif|public/assets/*/*.gif|public/assets/*/*.jpg|public/assets/*/*.jpeg|public/assets/*/*.png|public/assets/*/*.webp)
+        printf '%s\n' "[push 차단] 커밋 $commit 에 로컬 이미지 에셋이 포함되어 있습니다: $path" >&2
+        blocked=1
+        ;;
+    esac
+  done
+}
+
+while read -r local_ref local_oid remote_ref remote_oid; do
+  if [ "$local_oid" = "$zero_oid" ]; then
+    continue
+  fi
+
+  if [ "$remote_oid" = "$zero_oid" ]; then
+    commits=$(git rev-list "$local_oid" --not --remotes="$remote_name" 2>/dev/null || git rev-list "$local_oid")
+  else
+    commits=$(git rev-list "$remote_oid..$local_oid")
+  fi
+
+  for commit in $commits; do
+    check_commit "$commit"
+  done
+done
+
+if [ "$blocked" -ne 0 ]; then
+  printf '%s\n' "원격 전송을 중단했습니다. data/와 로컬 에셋을 커밋 기록에서 제거한 뒤 다시 시도하세요." >&2
+  exit 1
+fi
+
+exit 0

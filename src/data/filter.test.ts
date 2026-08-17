@@ -15,6 +15,7 @@ const baseFilter: FilterSettings = {
   tags: [],
   verifiedOnly: true,
   excludeUsedQuestions: true,
+  includePrivateQuestions: true,
   questionOrder: "data",
 };
 
@@ -30,5 +31,11 @@ describe("filterQuestions", () => {
     const source = [1, 2, 3];
     expect(shuffle(source, random)).toEqual([2, 3, 1]);
     expect(source).toEqual([1, 2, 3]);
+  });
+
+  it("로컬 전용 문제를 설정에 따라 포함하거나 제외한다", () => {
+    const privateQuestion = { ...questions[0], id: "private", usageScope: "private_only" as const };
+    expect(filterQuestions([privateQuestion], baseFilter, [])).toHaveLength(1);
+    expect(filterQuestions([privateQuestion], { ...baseFilter, includePrivateQuestions: false }, [])).toHaveLength(0);
   });
 });

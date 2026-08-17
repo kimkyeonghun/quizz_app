@@ -22,6 +22,7 @@ export function filterQuestions(
     if (filter.category && question.category !== filter.category) return false;
     if (filter.tags.length && !filter.tags.every((tag) => question.tags?.includes(tag))) return false;
     if (filter.excludeUsedQuestions && used.has(question.id)) return false;
+    if (!filter.includePrivateQuestions && question.usageScope === "private_only") return false;
     return true;
   });
 
