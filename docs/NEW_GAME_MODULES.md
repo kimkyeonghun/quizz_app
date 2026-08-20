@@ -12,6 +12,13 @@ The six post-MVP games live under `src/game-modules` and do not import `App`, th
 
 The `feature/remaining-games-modules` branch can be merged independently. Changes that connect these modules to the current application are kept on `feature/remaining-games-current-adapter` so a newer host implementation can replace that adapter without rewriting the games.
 
+## Current game behavior
+
+- `logo_quiz` now owns the three-stage crop behavior that was prototyped by `zoom_image`. The legacy `zoom_image` module remains registered for old sessions but is hidden from the selection screen.
+- `movie_poster` supports normalized title masks with `BLUR` and `BLANK` modes. Masks disappear when the answer is revealed.
+- `song_drawing` displays one completed image per song. Content records one selected style: `CHILD_DOODLE`, `ADULT_SKETCH`, or `PROFESSIONAL_ILLUSTRATION`.
+- `taboo` remains disabled by its feature flag.
+
 ## Assets
 
 Bundled visual and audio samples are original, deterministic demo assets. They are intentionally fictional and should be replaced by licensed production content. Every media record must retain `source`, `metadata.license`, and `metadata.credit`.

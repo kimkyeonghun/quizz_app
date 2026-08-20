@@ -2,28 +2,24 @@
 import type { GameModule, GameQuestionProps, NewGameSettings } from "../contracts";
 import { keepRuntime, noopRuntime } from "../contracts";
 import styles from "../shared/MediaFrame.module.css";
-import { MediaFrame } from "../shared/VisualAsset";
+import { MediaFrame, VisualAsset } from "../shared/VisualAsset";
 import { songDrawingQuestionSchema, type SongDrawingQuestion } from "./schema";
 export { songDrawingQuestionSchema, type SongDrawingQuestion } from "./schema";
 type DrawingRuntime = typeof noopRuntime;
 type DrawingAction = { type: "RESET" };
 
-function SongDrawingView({ question, stageIndex, revealed }: GameQuestionProps<SongDrawingQuestion, DrawingRuntime, DrawingAction>) {
-  const asset = `${import.meta.env.BASE_URL}${question.asset.replace(/^\//, "")}`;
+const styleLabels = {
+  CHILD_DOODLE: "초등학생 낙서",
+  ADULT_SKETCH: "일반 성인 그림",
+  PROFESSIONAL_ILLUSTRATION: "전문가 일러스트",
+} as const;
+
+function SongDrawingView({ question, revealed }: GameQuestionProps<SongDrawingQuestion, DrawingRuntime, DrawingAction>) {
+  const symbolId = question.metadata.symbolId ?? question.metadata.stageSymbolIds?.[0];
   return (
     <MediaFrame>
-      <div className={styles.drawingGrid} role="img" aria-label={`${stageIndex + 1}단계 노래 그림 힌트`}>
-        {question.metadata.stageSymbolIds.map((symbolId, index) => (
-          <div className={styles.drawingCell} key={symbolId}>
-            {index <= stageIndex ? (
-              <svg viewBox="0 0 100 100" aria-hidden="true"><use href={`${asset}#${symbolId}`} /></svg>
-            ) : (
-              <span className={styles.drawingLocked}>?</span>
-            )}
-          </div>
-        ))}
-      </div>
-      {revealed && <p className={styles.revealMeta}>{question.metadata.artist}</p>}
+      <VisualAsset asset={question.asset} symbolId={symbolId} alt="노래 가사를 해석한 한 장의 그림" />
+      {revealed && <p className={styles.revealMeta}>{question.metadata.artist} · {styleLabels[question.metadata.visualStyle]}</p>}
     </MediaFrame>
   );
 }
@@ -31,24 +27,24 @@ function SongDrawingView({ question, stageIndex, revealed }: GameQuestionProps<S
 export const songDrawingModule: GameModule<SongDrawingQuestion, NewGameSettings, DrawingRuntime, DrawingAction> = {
   id: "song_drawing",
   label: "노래 그림",
-  shortDescription: "차례로 공개되는 그림을 조합해 노래 제목을 맞힙니다.",
+  shortDescription: "K-pop 노래 가사를 해석한 한 장의 그림으로 곡명을 맞힙니다.",
   accent: "#ad5e8d",
-  engine: "progressive",
+  engine: "media",
   questionSchema: songDrawingQuestionSchema,
   defaultSettings: {
-    stageDurationSec: 15,
-    stageScores: [3, 2, 1],
+    questionDurationSec: 25,
+    scoreOnSuccess: 1,
     allowPass: false,
     wrongAnswerPolicy: "STEAL",
   },
   instructions: {
-    objective: "노래 제목을 표현한 그림 힌트를 순서대로 보고 곡명을 맞힙니다.",
-    steps: ["첫 그림을 공개합니다.", "정답이 없으면 다음 그림을 추가합니다.", "모든 그림을 조합해 제목을 추리합니다.", "곡명과 아티스트를 공개합니다."],
-    scoring: ["첫 그림 3점, 두 번째 2점, 마지막 1점이 기본입니다.", "현재 공개 단계의 점수를 적용합니다."],
-    hostTips: ["그림을 설명하거나 읽어주지 마세요.", "제목의 조사 차이는 허용 답안으로 관리하세요."],
+    objective: "K-pop 노래 가사의 장면과 정서를 해석한 완성 그림 한 장을 보고 곡명을 맞힙니다.",
+    steps: ["노래별 완성 그림 한 장을 공개합니다.", "그림은 초등학생 낙서, 일반 성인 그림, 전문가 일러스트 중 무작위로 선택된 한 화풍을 사용합니다.", "현재 팀이 곡명을 말합니다.", "진행자가 판정한 뒤 곡명과 아티스트를 공개합니다."],
+    scoring: ["정답은 기본 1점입니다.", "화풍에 따른 점수 차이는 두지 않습니다."],
+    hostTips: ["그림을 설명하거나 가사를 직접 인용하지 마세요.", "그림 안에 곡명, 가수명, 앨범 로고가 노출되지 않았는지 확인하세요.", "제목의 조사와 영문 표기는 허용 답안으로 관리하세요."],
   },
   initialRuntime: noopRuntime,
   reduceRuntime: keepRuntime,
-  getStageCount: (question) => question.metadata.stageSymbolIds.length,
+  getStageCount: () => 1,
   QuestionView: SongDrawingView,
 };

@@ -7,9 +7,9 @@ import { newGameModules } from "../game-modules/registry";
 const engineByGame: Record<NewGameId, GameDefinition["engine"]> = {
   music_intro: "progressive",
   zoom_image: "progressive",
-  logo_quiz: "standard",
+  logo_quiz: "progressive",
   movie_poster: "standard",
-  song_drawing: "progressive",
+  song_drawing: "standard",
   taboo: "speed",
 };
 
@@ -36,7 +36,8 @@ export const playableGameRegistry: Record<GameType, GameDefinition> = {
 export const availableGameDefinitions = [
   ...gameDefinitions,
   ...Object.values(newGameDefinitions).filter(
-    (definition) => definition.id !== "taboo" || defaultConfig.features.tabooGame,
+    (definition) => definition.id !== "zoom_image"
+      && (definition.id !== "taboo" || defaultConfig.features.tabooGame),
   ),
 ];
 

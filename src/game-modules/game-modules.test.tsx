@@ -4,6 +4,9 @@ import { newGameModules } from "./registry";
 import { newGameQuestionSchema } from "./questionSchemas";
 import { newGameQuestionLoadErrors, newGameQuestions } from "./questions";
 import { reduceTabooRuntime, tabooModule } from "./taboo";
+import { logoQuizQuestionSchema } from "./logo-quiz/schema";
+import { moviePosterQuestionSchema } from "./movie-poster/schema";
+import { songDrawingQuestionSchema } from "./song-drawing/schema";
 import { zoomImageQuestionSchema } from "./zoom-image/schema";
 
 const shared = {
@@ -28,9 +31,10 @@ describe("new game modules", () => {
   });
 
   it("loads every bundled sample with the strict module schemas", () => {
+    const bundledQuestions = newGameQuestions.filter((question) => !question.id.startsWith("local-"));
     expect(newGameQuestionLoadErrors).toEqual([]);
-    expect(newGameQuestions).toHaveLength(74);
-    expect(Object.fromEntries(Object.keys(newGameModules).map((gameId) => [gameId, newGameQuestions.filter((question) => question.gameType === gameId).length]))).toEqual({
+    expect(bundledQuestions).toHaveLength(74);
+    expect(Object.fromEntries(Object.keys(newGameModules).map((gameId) => [gameId, bundledQuestions.filter((question) => question.gameType === gameId).length]))).toEqual({
       music_intro: 6,
       zoom_image: 12,
       logo_quiz: 12,
@@ -86,6 +90,83 @@ describe("new game modules", () => {
       },
     });
     expect(newGameModules.zoom_image.getStageCount(result, newGameModules.zoom_image.defaultSettings)).toBe(3);
+  });
+
+  it("treats logo questions as three progressive crop stages", () => {
+    const result = logoQuizQuestionSchema.parse({
+      ...shared,
+      id: "logo-stage-test",
+      gameType: "logo_quiz",
+      answer: "테스트",
+      asset: "/assets/sample.svg",
+      metadata: {
+        brandCategory: "기술",
+        license: "ORIGINAL",
+        credit: "직접 제작",
+      },
+    });
+    expect(result.metadata.crops).toHaveLength(3);
+    expect(newGameModules.logo_quiz.getStageCount(result, newGameModules.logo_quiz.defaultSettings)).toBe(3);
+    expect(newGameModules.logo_quiz.defaultSettings.stageScores).toEqual([3, 2, 1]);
+  });
+
+  it("rejects movie title masks outside the poster", () => {
+    const result = moviePosterQuestionSchema.safeParse({
+      ...shared,
+      id: "movie-mask-test",
+      gameType: "movie_poster",
+      answer: "테스트",
+      asset: "/assets/poster.jpg",
+      metadata: {
+        releaseYear: 2026,
+        country: "대한민국",
+        titleMasks: [{ x: 80, y: 90, width: 30, height: 20, mode: "BLANK" }],
+        license: "ORIGINAL",
+        credit: "직접 제작",
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("covers movie title regions until the answer is revealed", () => {
+    const question = moviePosterQuestionSchema.parse({
+      ...shared,
+      id: "movie-mask-render-test",
+      gameType: "movie_poster",
+      answer: "테스트",
+      asset: "/assets/poster.jpg",
+      metadata: {
+        releaseYear: 2026,
+        country: "대한민국",
+        titleMasks: [{ x: 10, y: 75, width: 80, height: 15, mode: "BLUR" }],
+        license: "ORIGINAL",
+        credit: "직접 제작",
+      },
+    });
+    const sharedProps = { question, stageIndex: 0, runtime: newGameModules.movie_poster.initialRuntime, dispatch: () => undefined };
+    const { container, rerender } = render(<newGameModules.movie_poster.QuestionView {...sharedProps} revealed={false} />);
+    expect(container.querySelectorAll("span[aria-hidden='true']")).toHaveLength(1);
+    rerender(<newGameModules.movie_poster.QuestionView {...sharedProps} revealed />);
+    expect(container.querySelectorAll("span[aria-hidden='true']")).toHaveLength(0);
+  });
+
+  it("uses one completed image and one fixed drawing style per song", () => {
+    const result = songDrawingQuestionSchema.parse({
+      ...shared,
+      id: "song-drawing-test",
+      gameType: "song_drawing",
+      answer: "테스트",
+      asset: "/assets/song-drawing.png",
+      metadata: {
+        artist: "테스트 가수",
+        visualStyle: "CHILD_DOODLE",
+        lyricConcept: "밤하늘 아래 다시 만나는 장면",
+        license: "ORIGINAL",
+        credit: "직접 제작",
+      },
+    });
+    expect(result.metadata.visualStyle).toBe("CHILD_DOODLE");
+    expect(newGameModules.song_drawing.getStageCount(result, newGameModules.song_drawing.defaultSettings)).toBe(1);
   });
 
   it("toggles taboo forbidden words through serializable runtime", () => {

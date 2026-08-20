@@ -39,8 +39,8 @@ export function reduceNewGameRuntime(gameId: string, runtime: unknown, action: u
 }
 
 export function getNewGameStageCount(question: PlayableQuestion): number {
+  if (question.gameType === "logo_quiz") return logoQuizModule.getStageCount(question, logoQuizModule.defaultSettings);
   if (question.gameType === "zoom_image") return zoomImageModule.getStageCount(question, zoomImageModule.defaultSettings);
   if (question.gameType === "music_intro") return musicIntroModule.getStageCount(question, musicIntroModule.defaultSettings);
-  if (question.gameType === "song_drawing") return songDrawingModule.getStageCount(question, songDrawingModule.defaultSettings);
   return 1;
 }

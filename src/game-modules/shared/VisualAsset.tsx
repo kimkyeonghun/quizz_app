@@ -38,6 +38,18 @@ export function VisualAsset({ asset, alt, symbolId, viewBox = "0 0 100 100" }: V
     );
   }
 
+  if (viewBox !== "0 0 100 100") {
+    const url = assetUrl(asset);
+    return (
+      <>
+        <img className={styles.assetProbe} src={url} alt="" aria-hidden="true" onError={() => setFailed(true)} />
+        <svg className={styles.sprite} viewBox={viewBox} role="img" aria-label={alt}>
+          <image href={url} width="100" height="100" preserveAspectRatio="xMidYMid meet" />
+        </svg>
+      </>
+    );
+  }
+
   return <img className={styles.image} src={assetUrl(asset)} alt={alt} onError={() => setFailed(true)} />;
 }
 

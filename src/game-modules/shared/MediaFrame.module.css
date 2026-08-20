@@ -40,6 +40,36 @@
   object-fit: contain;
 }
 
+.posterSurface {
+  max-width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #181818;
+}
+
+.posterSurface .image,
+.posterSurface .sprite {
+  position: absolute;
+  inset: 0;
+}
+
+.posterMaskBlur,
+.posterMaskBlank {
+  position: absolute;
+  z-index: 1;
+  display: block;
+}
+
+.posterMaskBlur {
+  background: #18181873;
+  backdrop-filter: blur(14px);
+}
+
+.posterMaskBlank {
+  background: #181818;
+}
+
 .fallback {
   width: 100%;
   height: 100%;
