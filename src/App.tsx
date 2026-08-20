@@ -23,20 +23,27 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { gameDefinitions, gameRegistry } from "./config/gameRegistry";
+import { availableGameDefinitions, getPlayableGameDefinition, playableGameRegistry } from "./adapters/newGames";
+import { getNewGameStageCount, NewGameQuestionContent } from "./adapters/NewGameQuestionContent";
 import { filterQuestions } from "./data/filter";
 import { questionLoadErrors, questions, questionsForGame } from "./data/questions";
 import type {
   FilterSettings,
   GameSettings,
-  MvpGameType,
+  GameType,
   MvpQuestion,
+  PlayableQuestion,
 } from "./domain/types";
+import { MVP_GAME_TYPES } from "./domain/types";
 import { answerMatchesQuestion } from "./domain/answerMatching";
 import { useGameTimer } from "./hooks/useGameTimer";
 import { useSessionStore } from "./store/sessionStore";
 
 const teamColorOptions = ["#e14d3a", "#3973c6", "#1e8f65", "#e29b23", "#8d5bb7"];
+
+function isMvpQuestion(question: PlayableQuestion): question is MvpQuestion {
+  return (MVP_GAME_TYPES as readonly string[]).includes(question.gameType);
+}
 
 function ActionButton({
   icon,
@@ -103,7 +110,7 @@ function HomeScreen() {
         </div>
       </section>
       <section className="status-strip" aria-label="앱 상태">
-        <span>6개 게임</span>
+        <span>{availableGameDefinitions.length}개 게임</span>
         <span>2~4팀</span>
         <span>오프라인 플레이</span>
         <span>Undo 지원</span>
@@ -114,7 +121,7 @@ function HomeScreen() {
 
 function DataAdminScreen() {
   const setScreen = useSessionStore((state) => state.setScreen);
-  const [gameId, setGameId] = useState<MvpGameType>("person_quiz");
+  const [gameId, setGameId] = useState<GameType>("person_quiz");
   const [query, setQuery] = useState("");
   const [difficulty, setDifficulty] = useState("all");
   const [category, setCategory] = useState("all");
@@ -127,8 +134,9 @@ function DataAdminScreen() {
   const filtered = gameQuestions.filter((question) => {
     if (difficulty !== "all" && question.difficulty !== Number(difficulty)) return false;
     if (category !== "all" && question.category !== category) return false;
-    if (scope === "private" && question.usageScope !== "private_only") return false;
-    if (scope === "redistributable" && question.usageScope === "private_only") return false;
+    const usageScope = isMvpQuestion(question) ? question.usageScope : "redistributable";
+    if (scope === "private" && usageScope !== "private_only") return false;
+    if (scope === "redistributable" && usageScope === "private_only") return false;
     if (!normalizedQuery) return true;
     const searchable = [question.id, question.answer ?? "", ...(question.acceptedAnswers ?? []), question.category,
       questionPrompt(question), JSON.stringify(question.metadata ?? {})].join(" ").normalize("NFC").toLocaleLowerCase("ko-KR");
@@ -137,9 +145,9 @@ function DataAdminScreen() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageQuestions = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const totalPrivate = questions.filter((question) => question.usageScope === "private_only").length;
+  const totalPrivate = questions.filter((question) => isMvpQuestion(question) && question.usageScope === "private_only").length;
 
-  const changeGame = (nextGameId: MvpGameType) => {
+  const changeGame = (nextGameId: GameType) => {
     setGameId(nextGameId); setQuery(""); setDifficulty("all"); setCategory("all"); setScope("all"); setPage(1);
   };
 
@@ -157,7 +165,7 @@ function DataAdminScreen() {
     </section>
 
     <nav className="admin-game-tabs" aria-label="게임별 데이터">
-      {gameDefinitions.map((game) => {
+      {Object.values(playableGameRegistry).map((game) => {
         const count = questionsForGame(game.id).length;
         return <button key={game.id} aria-label={`${game.label} ${count}문항`} className={gameId === game.id ? "active" : ""} style={{ "--tab-accent": game.accent } as React.CSSProperties}
           onClick={() => changeGame(game.id)}><span>{game.label}</span><strong>{count}</strong></button>;
@@ -178,8 +186,8 @@ function DataAdminScreen() {
       </select></label>
     </section>
 
-    <div className="admin-list-heading"><div><strong>{gameRegistry[gameId].label}</strong><span>{filtered.length}개 표시</span></div><span>행을 열어 전체 데이터와 출처를 확인하세요.</span></div>
-    <section className="admin-question-list" aria-label={`${gameRegistry[gameId].label} 문제 목록`}>
+    <div className="admin-list-heading"><div><strong>{getPlayableGameDefinition(gameId).label}</strong><span>{filtered.length}개 표시</span></div><span>행을 열어 전체 데이터와 출처를 확인하세요.</span></div>
+    <section className="admin-question-list" aria-label={`${getPlayableGameDefinition(gameId).label} 문제 목록`}>
       {pageQuestions.length ? pageQuestions.map((question, index) => <AdminQuestionRow key={question.id} question={question} number={(safePage - 1) * pageSize + index + 1} />)
         : <div className="admin-empty"><Search size={34} /><strong>조건에 맞는 문항이 없습니다.</strong></div>}
     </section>
@@ -192,7 +200,7 @@ function DataAdminScreen() {
   </main>;
 }
 
-function AdminQuestionRow({ question, number }: { question: MvpQuestion; number: number }) {
+function AdminQuestionRow({ question, number }: { question: PlayableQuestion; number: number }) {
   return <details className="admin-question-row">
     <summary>
       <span className="admin-row-number">{number}</span>
@@ -200,7 +208,7 @@ function AdminQuestionRow({ question, number }: { question: MvpQuestion; number:
       <span className="admin-row-main"><small>{question.id}</small><strong>{questionPrompt(question)}</strong></span>
       <span className="admin-row-answer"><small>정답</small><strong>{questionAnswer(question)}</strong></span>
       <span className="admin-row-meta"><em>난이도 {question.difficulty}</em><em>{question.category}</em>
-        {question.usageScope === "private_only" && <em className="private">로컬 전용</em>}</span>
+        {isMvpQuestion(question) && question.usageScope === "private_only" && <em className="private">로컬 전용</em>}</span>
     </summary>
     <div className="admin-question-detail">
       <section><h3>문항 데이터</h3><QuestionMetadata question={question} />
@@ -208,34 +216,47 @@ function AdminQuestionRow({ question, number }: { question: MvpQuestion; number:
         {question.tags?.length ? <p><strong>태그</strong>{question.tags.join(" · ")}</p> : null}
       </section>
       <section><h3>출처·권한</h3>
-        {question.attribution && <p><strong>이미지</strong><a href={question.attribution.sourceUrl} target="_blank" rel="noreferrer">원본 페이지</a> · {question.attribution.license} · {question.attribution.accessedAt}</p>}
-        {question.sources?.map((source) => <p key={source.url}><strong>{source.publisher}</strong><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> · {source.accessedAt}</p>)}
-        {!question.attribution && !question.sources?.length && !question.source && <p className="admin-muted">등록된 외부 출처가 없는 자체 작성 문항입니다.</p>}
-        {question.source && !question.sources?.length && <p><a href={question.source} target="_blank" rel="noreferrer">문항 출처</a></p>}
+        {isMvpQuestion(question) && question.attribution && <p><strong>이미지</strong><a href={question.attribution.sourceUrl} target="_blank" rel="noreferrer">원본 페이지</a> · {question.attribution.license} · {question.attribution.accessedAt}</p>}
+        {isMvpQuestion(question) && question.sources?.map((source) => <p key={source.url}><strong>{source.publisher}</strong><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> · {source.accessedAt}</p>)}
+        {!isMvpQuestion(question) && "license" in question.metadata && <p><strong>미디어</strong>{String(question.metadata.license)} · {String(question.metadata.credit)}</p>}
+        {question.source && <p><a href={question.source} target="_blank" rel="noreferrer">문항 출처</a></p>}
+        {!question.source && (!isMvpQuestion(question) || (!question.attribution && !question.sources?.length)) && <p className="admin-muted">등록된 외부 출처가 없는 자체 작성 문항입니다.</p>}
       </section>
     </div>
   </details>;
 }
 
-function QuestionMetadata({ question }: { question: MvpQuestion }) {
+function QuestionMetadata({ question }: { question: PlayableQuestion }) {
   if (question.gameType === "person_quiz") return <p><strong>힌트</strong>{question.metadata?.clue ?? "없음"}</p>;
   if (question.gameType === "charades") return <p><strong>제시어</strong>{question.answer}</p>;
   if (question.gameType === "four_syllable") return <p><strong>앞말 / 완성어</strong>{question.metadata.prompt} / {question.metadata.fullAnswer}</p>;
   if (question.gameType === "three_in_time") return <><p><strong>판정 예시</strong>{question.metadata.examples.join(" · ")}</p><p><strong>판정 기준</strong>{question.metadata.judgingNotes}</p></>;
   if (question.gameType === "progressive_hint") return <ol className="admin-stage-list">{question.metadata.hints.map((hint) => <li key={hint}>{hint}</li>)}</ol>;
-  return <ol className="admin-stage-list">{question.metadata.career.map((entry) => <li key={`${entry.order}-${entry.club}`}>{entry.club}</li>)}</ol>;
+  if (question.gameType === "football_career") return <ol className="admin-stage-list">{question.metadata.career.map((entry) => <li key={`${entry.order}-${entry.club}`}>{entry.club}</li>)}</ol>;
+  if (question.gameType === "music_intro") return <p><strong>아티스트 / 재생 길이</strong>{question.metadata.artist} / {question.metadata.clipDurationsSec.join(" · ")}초</p>;
+  if (question.gameType === "logo_quiz") return <p><strong>브랜드 분류 / 공개 단계</strong>{question.metadata.brandCategory} / {question.metadata.crops.length}단계</p>;
+  if (question.gameType === "zoom_image") return <p><strong>확대 공개 단계</strong>{question.metadata.crops.length}단계</p>;
+  if (question.gameType === "movie_poster") return <p><strong>개봉 / 국가 / 제목 마스크</strong>{question.metadata.releaseYear} / {question.metadata.country} / {question.metadata.titleMasks.length}개</p>;
+  if (question.gameType === "song_drawing") return <><p><strong>아티스트 / 화풍</strong>{question.metadata.artist} / {question.metadata.visualStyle}</p>{question.metadata.lyricConcept && <p><strong>그림 콘셉트</strong>{question.metadata.lyricConcept}</p>}</>;
+  return <p><strong>금지어</strong>{question.metadata.forbiddenWords.join(" · ")}</p>;
 }
 
-function questionPrompt(question: MvpQuestion): string {
+function questionPrompt(question: PlayableQuestion): string {
   if (question.gameType === "person_quiz") return question.metadata?.clue ?? "인물 이미지";
   if (question.gameType === "charades") return question.answer;
   if (question.gameType === "four_syllable") return `${question.metadata.prompt}··`;
   if (question.gameType === "three_in_time") return question.metadata.prompt;
   if (question.gameType === "progressive_hint") return question.metadata.hints[0];
-  return question.metadata.career.map((entry) => entry.club).join(" → ");
+  if (question.gameType === "football_career") return question.metadata.career.map((entry) => entry.club).join(" → ");
+  if (question.gameType === "music_intro") return `${question.metadata.artist} 전주`;
+  if (question.gameType === "logo_quiz") return `${question.metadata.brandCategory} 로고`;
+  if (question.gameType === "zoom_image") return "확대 이미지";
+  if (question.gameType === "movie_poster") return `${question.metadata.releaseYear}년 ${question.metadata.country} 영화`;
+  if (question.gameType === "song_drawing") return question.metadata.lyricConcept ?? `${question.metadata.artist} 노래 그림`;
+  return question.answer;
 }
 
-function questionAnswer(question: MvpQuestion): string {
+function questionAnswer(question: PlayableQuestion): string {
   if (question.gameType === "three_in_time") return "사회자 판정";
   if (question.gameType === "four_syllable") return question.metadata.fullAnswer;
   return question.answer ?? "-";
@@ -322,7 +343,7 @@ function GameSelectScreen() {
         </div>
       )}
       <section className="game-grid">
-        {gameDefinitions.map((game, index) => {
+        {availableGameDefinitions.map((game, index) => {
           const count = questionsForGame(game.id).length;
           const selected = selectedGameIds.includes(game.id);
           return (
@@ -366,7 +387,7 @@ function GameIntroScreen() {
   const setScreen = useSessionStore((state) => state.setScreen);
 
   if (!currentGameId) return null;
-  const game = gameRegistry[currentGameId];
+  const game = getPlayableGameDefinition(currentGameId);
 
   return (
     <ScreenFrame title={game.label} subtitle="게임을 시작하기 전에 진행 방식을 확인하세요.">
@@ -422,7 +443,7 @@ function GameSetupScreen() {
   const clearUsedQuestions = useSessionStore((state) => state.clearUsedQuestions);
 
   if (!currentGameId) return null;
-  const game = gameRegistry[currentGameId];
+  const game = getPlayableGameDefinition(currentGameId);
   const settings = settingsByGame[currentGameId];
   const gameQuestions = questionsForGame(currentGameId);
   const categories = [...new Set(gameQuestions.map((question) => question.category))].sort();
@@ -470,7 +491,10 @@ function GameSetupScreen() {
           variant="primary"
           icon={<Play size={20} />}
           disabled={insufficientQuestions || invalidSettings}
-          onClick={() => startRound(queue.map((question) => question.id))}
+          onClick={() => startRound(
+            queue.map((question) => question.id),
+            Object.fromEntries(queue.map((question) => [question.id, getNewGameStageCount(question)])),
+          )}
         >
           라운드 시작
         </ActionButton>
@@ -479,18 +503,21 @@ function GameSetupScreen() {
   );
 }
 
-function settingsAreValid(gameId: MvpGameType, settings: GameSettings): boolean {
-  const game = gameRegistry[gameId];
+function settingsAreValid(gameId: GameType, settings: GameSettings): boolean {
+  const game = getPlayableGameDefinition(gameId);
   if (game.engine === "speed") {
     if ((settings.roundDurationSec ?? 0) < 10 || (settings.roundDurationSec ?? 0) > 600) return false;
     if ((settings.scorePerCorrect ?? 0) < 1 || (settings.scorePerCorrect ?? 0) > 100) return false;
-    if (gameId === "charades" && ((settings.previewDurationSec ?? 0) < 1 || (settings.previewDurationSec ?? 0) > 10)) return false;
+    if ((settings.previewDurationSec ?? 0) > 0 && ((settings.previewDurationSec ?? 0) < 1 || (settings.previewDurationSec ?? 0) > 10)) return false;
     return true;
   }
   if ((settings.roundQuestionCount ?? 0) < 1 || (settings.roundQuestionCount ?? 0) > 30) return false;
   if (game.engine === "standard") {
-    return (settings.questionDurationSec ?? 0) >= 3 && (settings.questionDurationSec ?? 0) <= 15
-      && (settings.requiredCount ?? 0) >= 2 && (settings.requiredCount ?? 0) <= 5
+    const durationValid = gameId === "three_in_time"
+      ? (settings.questionDurationSec ?? 0) >= 3 && (settings.questionDurationSec ?? 0) <= 15
+      : (settings.questionDurationSec ?? 0) >= 3 && (settings.questionDurationSec ?? 0) <= 120;
+    const countValid = gameId !== "three_in_time" || ((settings.requiredCount ?? 0) >= 2 && (settings.requiredCount ?? 0) <= 5);
+    return durationValid && countValid
       && (settings.scoreOnSuccess ?? 0) >= 1 && (settings.scoreOnSuccess ?? 0) <= 100;
   }
   const scores = settings.stageScores;
@@ -504,11 +531,11 @@ function SettingsFields({
   settings,
   updateSettings,
 }: {
-  gameId: MvpGameType;
+  gameId: GameType;
   settings: GameSettings;
-  updateSettings: (id: MvpGameType, updates: Partial<GameSettings>) => void;
+  updateSettings: (id: GameType, updates: Partial<GameSettings>) => void;
 }) {
-  const game = gameRegistry[gameId];
+  const game = getPlayableGameDefinition(gameId);
   const numericField = (
     key: keyof GameSettings,
     label: string,
@@ -543,9 +570,9 @@ function SettingsFields({
         <div className="field-stack">
           {game.engine === "speed" && numericField("roundDurationSec", "라운드 시간 (초)", 10, 600)}
           {game.engine !== "speed" && numericField("roundQuestionCount", "라운드 문제 수", 1, 30)}
-          {game.engine === "standard" && numericField("questionDurationSec", "문제 시간 (초)", 3, 15)}
+          {game.engine === "standard" && numericField("questionDurationSec", "문제 시간 (초)", 3, gameId === "three_in_time" ? 15 : 120)}
           {game.engine === "progressive" && numericField("stageDurationSec", gameId === "football_career" ? "문제 시간 (초)" : "단계별 시간 (초)", 3, 120)}
-          {gameId === "charades" && numericField("previewDurationSec", "설명자 확인 시간 (초)", 1, 10)}
+          {(gameId === "charades" || gameId === "taboo") && numericField("previewDurationSec", "설명자 확인 시간 (초)", 1, 10)}
           {game.engine === "speed" && numericField("scorePerCorrect", "정답 점수", 1, 100)}
           {game.engine === "standard" && numericField("scoreOnSuccess", "성공 점수", 1, 100)}
           {gameId === "three_in_time" && numericField("requiredCount", "필요 답변 수", 2, 5)}
@@ -611,9 +638,10 @@ function FilterFields({
 function GamePlayScreen() {
   const state = useSessionStore();
   const dispatch = useSessionStore((store) => store.dispatch);
+  const dispatchModuleAction = useSessionStore((store) => store.dispatchModuleAction);
   const currentQuestionId = state.questionQueue[state.questionIndex];
   const question = questions.find((item) => item.id === currentQuestionId);
-  const game = state.currentGameId ? gameRegistry[state.currentGameId] : null;
+  const game = state.currentGameId ? getPlayableGameDefinition(state.currentGameId) : null;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -644,6 +672,7 @@ function GamePlayScreen() {
   const urgent = totalSeconds <= 10;
   const settings = state.settingsByGame[game.id];
   const attemptingTeam = state.teams.find((team) => team.id === state.attemptingTeamId);
+  const currentStageCount = state.questionStageCounts[question.id] ?? settings.stageCount ?? settings.stageScores?.length ?? 1;
   const canPause = state.roundTimerStatus === "running" || state.phaseTimerStatus === "running";
   const canResume = state.roundTimerStatus === "paused" || state.phaseTimerStatus === "paused";
 
@@ -672,7 +701,8 @@ function GamePlayScreen() {
       <section className="question-stage" style={{ "--accent": game.accent } as React.CSSProperties}>
         <div className="turn-indicator" style={{ color: currentTeam.color }}>{currentTeam.name} 도전</div>
         {state.phase === "ready" ? <div className="ready-cover"><Eye size={56} /><strong>문제가 아직 공개되지 않았습니다</strong><span>시작하면 문제와 타이머가 함께 표시됩니다.</span></div> :
-          <QuestionContent question={question} stageIndex={state.stageIndex} phase={state.phase} requiredCount={settings.requiredCount ?? 3} />}
+          <QuestionContent question={question} stageIndex={state.stageIndex} phase={state.phase} requiredCount={settings.requiredCount ?? 3}
+            runtime={state.moduleRuntime} dispatchModuleAction={dispatchModuleAction} />}
         {state.phase === "revealed" && question.answer && (
           <div className="answer-reveal"><span>정답</span><strong>{question.answer}</strong></div>
         )}
@@ -710,7 +740,7 @@ function GamePlayScreen() {
             {state.teams.map((team) => <button key={team.id} disabled={state.lockedTeamIds.includes(team.id)} className="team-correct-button"
               style={{ backgroundColor: team.color }} onClick={() => dispatch({ type: "ATTEMPT", teamId: team.id })}>
               <span>{state.lockedTeamIds.includes(team.id) ? `${team.name} 잠김` : `${team.name} 도전`}</span></button>)}
-            {(settings.stageCount ?? settings.stageScores?.length ?? 1) > 1 && <ActionButton icon={<SkipForward size={23} />} onClick={() => dispatch({ type: "NEXT_STAGE" })}>다음 단계</ActionButton>}
+            {currentStageCount > 1 && <ActionButton icon={<SkipForward size={23} />} onClick={() => dispatch({ type: "NEXT_STAGE" })}>다음 단계</ActionButton>}
           </>}
           {state.phase !== "ready" && state.phase !== "revealed" && game.engine !== "speed" && <ActionButton icon={<Eye size={23} />} onClick={() => dispatch({ type: "REVEAL" })}>정답 공개</ActionButton>}
           {state.phase === "revealed" && (
@@ -723,7 +753,14 @@ function GamePlayScreen() {
   );
 }
 
-function QuestionContent({ question, stageIndex, phase, requiredCount }: { question: MvpQuestion; stageIndex: number; phase: string; requiredCount: number }) {
+function QuestionContent({ question, stageIndex, phase, requiredCount, runtime, dispatchModuleAction }: {
+  question: PlayableQuestion;
+  stageIndex: number;
+  phase: string;
+  requiredCount: number;
+  runtime: unknown;
+  dispatchModuleAction: (action: unknown) => void;
+}) {
   const revealed = phase === "revealed";
   if (question.gameType === "person_quiz") {
     return (
@@ -748,7 +785,7 @@ function QuestionContent({ question, stageIndex, phase, requiredCount }: { quest
   if (question.gameType === "football_career") {
     return <div className="career-path">{question.metadata.career.map((entry, itemIndex) => <div key={`${entry.order}-${entry.club}`}><span>{itemIndex + 1}</span><strong>{entry.club}</strong></div>)}</div>;
   }
-  return null;
+  return <NewGameQuestionContent question={question} stageIndex={stageIndex} revealed={revealed} runtime={runtime} dispatch={dispatchModuleAction} />;
 }
 
 function HostConsolePortal() {
@@ -797,10 +834,10 @@ function HostConsolePortal() {
   </>;
 }
 
-function DirectAnswerPanel({ question }: { question: MvpQuestion }) {
+function DirectAnswerPanel({ question }: { question: PlayableQuestion }) {
   const state = useSessionStore();
   const dispatch = useSessionStore((store) => store.dispatch);
-  const game = state.currentGameId ? gameRegistry[state.currentGameId] : null;
+  const game = state.currentGameId ? getPlayableGameDefinition(state.currentGameId) : null;
   const [teamId, setTeamId] = useState(state.currentTeamId);
   const [guess, setGuess] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -836,14 +873,14 @@ function DirectAnswerPanel({ question }: { question: MvpQuestion }) {
   </form>;
 }
 
-function supportsDirectInput(gameId: MvpGameType): boolean {
-  return gameId !== "three_in_time";
+function supportsDirectInput(gameId: GameType): boolean {
+  return gameId !== "three_in_time" && gameId !== "taboo";
 }
 
 function HostConsole() {
   const state = useSessionStore();
   const dispatch = useSessionStore((store) => store.dispatch);
-  const game = state.currentGameId ? gameRegistry[state.currentGameId] : null;
+  const game = state.currentGameId ? getPlayableGameDefinition(state.currentGameId) : null;
   const question = questions.find((item) => item.id === state.questionQueue[state.questionIndex]);
   if (!game || !question) return <main className="host-console-page"><p>진행 중인 문제가 없습니다.</p></main>;
 
@@ -855,6 +892,7 @@ function HostConsole() {
   const remainingMs = isPhaseClock ? state.phaseRemainingMs : state.roundRemainingMs;
   const canPause = state.roundTimerStatus === "running" || state.phaseTimerStatus === "running";
   const canResume = state.roundTimerStatus === "paused" || state.phaseTimerStatus === "paused";
+  const currentStageCount = state.questionStageCounts[question.id] ?? settings.stageCount ?? settings.stageScores?.length ?? 1;
 
   return <main className="host-console-page">
     <header className="host-console-heading">
@@ -867,7 +905,7 @@ function HostConsole() {
     <div className="host-console-status">
       <span>문제 {state.questionIndex + 1} / {state.questionQueue.length}</span>
       <span>상태: {phaseLabel(state.phase)}</span>
-      {game.engine === "progressive" && (settings.stageCount ?? 1) > 1 && <span>단계 {state.stageIndex + 1}</span>}
+      {game.engine === "progressive" && currentStageCount > 1 && <span>단계 {state.stageIndex + 1} / {currentStageCount}</span>}
     </div>
     <HostAnswerGuide question={question} requiredCount={settings.requiredCount ?? 3} />
     {attemptingTeam && <section className="host-attempt"><strong>{attemptingTeam.name} 답변 판정</strong>
@@ -887,7 +925,7 @@ function HostConsole() {
         <ActionButton variant="danger" onClick={() => dispatch({ type: "WRONG", teamId: currentTeam.id })}>실패</ActionButton>
       </>}
       {state.phase === "active" && game.engine === "progressive" && state.teams.map((team) => <ActionButton key={team.id} disabled={state.lockedTeamIds.includes(team.id)} onClick={() => dispatch({ type: "ATTEMPT", teamId: team.id })}>{state.lockedTeamIds.includes(team.id) ? `${team.name} 잠김` : `${team.name} 도전`}</ActionButton>)}
-      {state.phase === "active" && game.engine === "progressive" && (settings.stageCount ?? settings.stageScores?.length ?? 1) > 1 && <ActionButton onClick={() => dispatch({ type: "NEXT_STAGE" })}>다음 단계</ActionButton>}
+      {state.phase === "active" && game.engine === "progressive" && currentStageCount > 1 && <ActionButton onClick={() => dispatch({ type: "NEXT_STAGE" })}>다음 단계</ActionButton>}
       {state.phase !== "ready" && state.phase !== "revealed" && game.engine !== "speed" && <ActionButton icon={<Eye size={20} />} onClick={() => dispatch({ type: "REVEAL" })}>정답 공개</ActionButton>}
       {state.phase === "revealed" && <ActionButton variant="primary" onClick={() => dispatch({ type: "NEXT" })}>다음 문제</ActionButton>}
       <ActionButton icon={<RotateCcw size={20} />} disabled={state.history.length === 0} onClick={() => dispatch({ type: "UNDO" })}>실행 취소</ActionButton>
@@ -896,7 +934,7 @@ function HostConsole() {
   </main>;
 }
 
-function HostAnswerGuide({ question, requiredCount }: { question: MvpQuestion; requiredCount: number }) {
+function HostAnswerGuide({ question, requiredCount }: { question: PlayableQuestion; requiredCount: number }) {
   const aliases = question.acceptedAnswers?.filter((answer) => answer !== question.answer) ?? [];
   return <section className="host-answer-guide">
     <span className="host-only-label">참가자 화면에 표시되지 않는 정보</span>
@@ -911,6 +949,10 @@ function HostAnswerGuide({ question, requiredCount }: { question: MvpQuestion; r
       {question.gameType === "four_syllable" && <p><strong>완성어</strong> {question.metadata.fullAnswer}</p>}
       {question.gameType === "progressive_hint" && <div><strong>전체 힌트</strong><ol>{question.metadata.hints.map((hint) => <li key={hint}>{hint}</li>)}</ol></div>}
       {question.gameType === "football_career" && <div><strong>전체 경력</strong><ol>{question.metadata.career.map((entry) => <li key={`${entry.order}-${entry.club}`}>{entry.club}</li>)}</ol></div>}
+      {question.gameType === "music_intro" && <p><strong>아티스트</strong> {question.metadata.artist}</p>}
+      {question.gameType === "movie_poster" && <p><strong>영화 정보</strong> {question.metadata.releaseYear} · {question.metadata.country}</p>}
+      {question.gameType === "song_drawing" && <p><strong>아티스트</strong> {question.metadata.artist}</p>}
+      {question.gameType === "taboo" && <div><strong>금지어</strong><ul>{question.metadata.forbiddenWords.map((word) => <li key={word}>{word}</li>)}</ul></div>}
     </>}
   </section>;
 }
@@ -919,7 +961,15 @@ function phaseLabel(phase: string): string {
   return ({ ready: "준비", preview: "설명자 확인", active: "진행", attempt: "판정", revealed: "정답 공개" } as Record<string, string>)[phase] ?? phase;
 }
 
-function ContentCredits({ question }: { question: MvpQuestion }) {
+function ContentCredits({ question }: { question: PlayableQuestion }) {
+  if (!isMvpQuestion(question)) {
+    const metadata = question.metadata as { license?: string; credit?: string };
+    if (!question.source && !metadata.license && !metadata.credit) return null;
+    return <details className="content-credits"><summary>콘텐츠 출처·라이선스</summary>
+      {(metadata.license || metadata.credit) && <p>미디어: {metadata.license ?? "미기재"} · {metadata.credit ?? "크레딧 미기재"}</p>}
+      {question.source && <p><a href={question.source} target="_blank" rel="noreferrer">문항 출처</a></p>}
+    </details>;
+  }
   if (!question.attribution && !question.sources?.length && !question.source) return null;
   return <details className="content-credits"><summary>콘텐츠 출처·라이선스</summary>
     {question.attribution && <p>사진: {question.attribution.author} · <a href={question.attribution.sourceUrl} target="_blank" rel="noreferrer">원본</a> · {question.attribution.licenseUrl ? <a href={question.attribution.licenseUrl} target="_blank" rel="noreferrer">{question.attribution.license}</a> : <span>{question.attribution.license}</span>} · {question.attribution.modified}</p>}
@@ -945,7 +995,7 @@ function RoundResultScreen() {
   const nextIndex = (teams.findIndex((team) => team.id === currentTeamId) + 1) % teams.length;
 
   return (
-    <ScreenFrame title="라운드 결과" subtitle={currentGameId ? gameRegistry[currentGameId].label : ""}>
+    <ScreenFrame title="라운드 결과" subtitle={currentGameId ? getPlayableGameDefinition(currentGameId).label : ""}>
       <section className="result-list">
         {teams.map((team) => (
           <div key={team.id} style={{ borderLeftColor: team.color }}>

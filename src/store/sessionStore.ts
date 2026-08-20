@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { gameRegistry } from "../config/gameRegistry";
-import type { AppScreen, FilterSettings, GameSettings, GameplayPhase, HostAction, MvpGameType, Team, TimerStatus } from "../domain/types";
+import { availableGameDefinitions, playableGameRegistry } from "../adapters/newGames";
+import { initialNewGameRuntime, reduceNewGameRuntime } from "../adapters/NewGameQuestionContent";
+import type { AppScreen, FilterSettings, GameSettings, GameplayPhase, HostAction, GameType, Team, TimerStatus } from "../domain/types";
 
 const TEAM_COLORS = ["#e14d3a", "#3973c6", "#1e8f65", "#e29b23"];
 
@@ -25,8 +26,8 @@ const defaultFilter: FilterSettings = {
   questionOrder: "random",
 };
 
-function defaultSettings(): Record<MvpGameType, GameSettings> {
-  return Object.fromEntries(Object.entries(gameRegistry).map(([id, game]) => [id, { ...game.defaultSettings }])) as Record<MvpGameType, GameSettings>;
+function defaultSettings(): Record<GameType, GameSettings> {
+  return Object.fromEntries(Object.entries(playableGameRegistry).map(([id, game]) => [id, { ...game.defaultSettings }])) as Record<GameType, GameSettings>;
 }
 
 function phaseDurationMs(settings: GameSettings): number {
@@ -53,6 +54,7 @@ interface SessionSnapshot {
   phaseRemainingMs: number;
   phaseDeadline: number | null;
   roundScores: Record<string, number>;
+  moduleRuntime: unknown;
   screen: AppScreen;
 }
 
@@ -60,12 +62,13 @@ export interface SessionStore {
   sessionId: string;
   screen: AppScreen;
   teams: Team[];
-  selectedGameIds: MvpGameType[];
-  currentGameId: MvpGameType | null;
+  selectedGameIds: GameType[];
+  currentGameId: GameType | null;
   currentTeamId: string;
-  settingsByGame: Record<MvpGameType, GameSettings>;
+  settingsByGame: Record<GameType, GameSettings>;
   filter: FilterSettings;
   questionQueue: string[];
+  questionStageCounts: Record<string, number>;
   questionIndex: number;
   stageIndex: number;
   roundNumber: number;
@@ -80,17 +83,19 @@ export interface SessionStore {
   phaseRemainingMs: number;
   phaseDeadline: number | null;
   roundScores: Record<string, number>;
+  moduleRuntime: unknown;
   history: SessionSnapshot[];
   setScreen: (screen: AppScreen) => void;
   setTeamCount: (count: number) => void;
   updateTeam: (teamId: string, updates: Pick<Team, "name" | "color">) => void;
-  toggleGame: (gameId: MvpGameType) => void;
-  selectGame: (gameId: MvpGameType) => void;
+  toggleGame: (gameId: GameType) => void;
+  selectGame: (gameId: GameType) => void;
   selectTeam: (teamId: string) => void;
-  updateSettings: (gameId: MvpGameType, updates: Partial<GameSettings>) => void;
+  updateSettings: (gameId: GameType, updates: Partial<GameSettings>) => void;
   updateFilter: (updates: Partial<FilterSettings>) => void;
-  startRound: (questionIds: string[]) => void;
+  startRound: (questionIds: string[], questionStageCounts?: Record<string, number>) => void;
   dispatch: (action: HostAction) => void;
+  dispatchModuleAction: (action: unknown) => void;
   tick: (now: number) => void;
   clearUsedQuestions: () => void;
   newSession: () => void;
@@ -104,7 +109,8 @@ function takeSnapshot(state: SessionStore): SessionSnapshot {
     usedQuestionIds: [...state.usedQuestionIds], roundTimerStatus: state.roundTimerStatus,
     roundRemainingMs: state.roundRemainingMs, roundDeadline: state.roundDeadline,
     phaseTimerStatus: state.phaseTimerStatus, phaseRemainingMs: state.phaseRemainingMs,
-    phaseDeadline: state.phaseDeadline, roundScores: { ...state.roundScores }, screen: state.screen,
+    phaseDeadline: state.phaseDeadline, roundScores: { ...state.roundScores },
+    moduleRuntime: structuredClone(state.moduleRuntime), screen: state.screen,
   };
 }
 
@@ -115,53 +121,58 @@ function usedWithCurrent(state: SessionStore): string[] {
 
 function nextQuestionState(state: SessionStore, autoStartSpeed: boolean): Partial<SessionStore> {
   if (!state.currentGameId) return {};
-  const game = gameRegistry[state.currentGameId];
+  const game = playableGameRegistry[state.currentGameId];
   const settings = state.settingsByGame[state.currentGameId];
   const nextIndex = state.questionIndex + 1;
   if (nextIndex >= state.questionQueue.length) {
     return { questionIndex: nextIndex, screen: "round_result", roundNumber: state.roundNumber + 1,
       phase: "revealed", roundTimerStatus: "paused", roundDeadline: null,
-      phaseTimerStatus: "paused", phaseDeadline: null };
+      phaseTimerStatus: "paused", phaseDeadline: null, moduleRuntime: initialNewGameRuntime(state.currentGameId) };
   }
   if (game.engine === "speed" && autoStartSpeed) {
-    if (state.currentGameId === "charades") {
+    if ((settings.previewDurationSec ?? 0) > 0) {
       const now = Date.now();
       const roundRemainingMs = state.roundDeadline ? Math.max(0, state.roundDeadline - now) : state.roundRemainingMs;
       const previewMs = (settings.previewDurationSec ?? 3) * 1000;
       return { questionIndex: nextIndex, stageIndex: 0, phase: "preview", attemptingTeamId: null, lockedTeamIds: [],
         roundTimerStatus: "paused", roundRemainingMs, roundDeadline: null,
-        phaseTimerStatus: "running", phaseRemainingMs: previewMs, phaseDeadline: now + previewMs };
+        phaseTimerStatus: "running", phaseRemainingMs: previewMs, phaseDeadline: now + previewMs,
+        moduleRuntime: initialNewGameRuntime(state.currentGameId) };
     }
-    return { questionIndex: nextIndex, stageIndex: 0, phase: "active", attemptingTeamId: null, lockedTeamIds: [] };
+    return { questionIndex: nextIndex, stageIndex: 0, phase: "active", attemptingTeamId: null, lockedTeamIds: [],
+      moduleRuntime: initialNewGameRuntime(state.currentGameId) };
   }
   return { questionIndex: nextIndex, stageIndex: 0, phase: "ready", attemptingTeamId: null, lockedTeamIds: [],
-    phaseTimerStatus: "idle", phaseRemainingMs: phaseDurationMs(settings), phaseDeadline: null };
+    phaseTimerStatus: "idle", phaseRemainingMs: phaseDurationMs(settings), phaseDeadline: null,
+    moduleRuntime: initialNewGameRuntime(state.currentGameId) };
 }
 
 function advanceStage(state: SessionStore, now: number): Partial<SessionStore> {
   if (!state.currentGameId) return {};
   const settings = state.settingsByGame[state.currentGameId];
-  const lastStage = Math.max(0, (settings.stageCount ?? settings.stageScores?.length ?? 1) - 1);
+  const questionId = state.questionQueue[state.questionIndex];
+  const lastStage = Math.max(0, (state.questionStageCounts[questionId] ?? settings.stageCount ?? settings.stageScores?.length ?? 1) - 1);
   if (state.stageIndex >= lastStage) {
     return { phase: "revealed", attemptingTeamId: null, lockedTeamIds: [], usedQuestionIds: usedWithCurrent(state),
       phaseTimerStatus: "expired", phaseRemainingMs: 0, phaseDeadline: null };
   }
   const duration = phaseDurationMs(settings);
   return { stageIndex: state.stageIndex + 1, phase: "active", attemptingTeamId: null, lockedTeamIds: [],
-    phaseTimerStatus: "running", phaseRemainingMs: duration, phaseDeadline: now + duration };
+    phaseTimerStatus: "running", phaseRemainingMs: duration, phaseDeadline: now + duration,
+    moduleRuntime: initialNewGameRuntime(state.currentGameId) };
 }
 
 export const useSessionStore = create<SessionStore>()(
   persist(
     (set, get) => ({
       sessionId: crypto.randomUUID(), screen: "home", teams: createTeams(),
-      selectedGameIds: [...Object.keys(gameRegistry)] as MvpGameType[], currentGameId: null,
+      selectedGameIds: availableGameDefinitions.map((game) => game.id), currentGameId: null,
       currentTeamId: "team-1", settingsByGame: defaultSettings(), filter: { ...defaultFilter },
-      questionQueue: [], questionIndex: 0, stageIndex: 0, roundNumber: 1, usedQuestionIds: [],
+      questionQueue: [], questionStageCounts: {}, questionIndex: 0, stageIndex: 0, roundNumber: 1, usedQuestionIds: [],
       phase: "ready", attemptingTeamId: null, lockedTeamIds: [],
       roundTimerStatus: "idle", roundRemainingMs: 0, roundDeadline: null,
       phaseTimerStatus: "idle", phaseRemainingMs: 0, phaseDeadline: null,
-      roundScores: {}, history: [],
+      roundScores: {}, moduleRuntime: {}, history: [],
 
       setScreen: (screen) => set({ screen }),
       setTeamCount: (count) => set((state) => {
@@ -175,19 +186,19 @@ export const useSessionStore = create<SessionStore>()(
       selectTeam: (teamId) => set({ currentTeamId: teamId }),
       updateSettings: (gameId, updates) => set((state) => ({ settingsByGame: { ...state.settingsByGame, [gameId]: { ...state.settingsByGame[gameId], ...updates } } })),
       updateFilter: (updates) => set((state) => ({ filter: { ...state.filter, ...updates } })),
-      startRound: (questionIds) => {
+      startRound: (questionIds, questionStageCounts = {}) => {
         const state = get();
         if (!state.currentGameId || questionIds.length === 0) return;
-        const game = gameRegistry[state.currentGameId];
+        const game = playableGameRegistry[state.currentGameId];
         const settings = state.settingsByGame[state.currentGameId];
         const limit = game.engine === "speed" ? questionIds.length : (settings.roundQuestionCount ?? (game.engine === "standard" ? 10 : 5));
         const queue = questionIds.slice(0, limit);
         if (queue.length < limit) return;
-        set({ questionQueue: queue, questionIndex: 0, stageIndex: 0, screen: "game_play", phase: "ready",
+        set({ questionQueue: queue, questionStageCounts, questionIndex: 0, stageIndex: 0, screen: "game_play", phase: "ready",
           attemptingTeamId: null, lockedTeamIds: [], roundTimerStatus: "idle",
           roundRemainingMs: game.engine === "speed" ? (settings.roundDurationSec ?? 60) * 1000 : 0, roundDeadline: null,
           phaseTimerStatus: "idle", phaseRemainingMs: game.engine === "speed" ? 0 : phaseDurationMs(settings), phaseDeadline: null,
-          roundScores: initialRoundScores(state.teams), history: [] });
+          roundScores: initialRoundScores(state.teams), moduleRuntime: initialNewGameRuntime(state.currentGameId), history: [] });
       },
       dispatch: (action) => set((state) => {
         if (action.type === "UNDO") {
@@ -195,14 +206,14 @@ export const useSessionStore = create<SessionStore>()(
           return previous ? { ...previous, history: state.history.slice(0, -1) } : state;
         }
         if (!state.currentGameId) return state;
-        const game = gameRegistry[state.currentGameId];
+        const game = playableGameRegistry[state.currentGameId];
         const settings = state.settingsByGame[state.currentGameId];
         const now = Date.now();
         const history = [...state.history.slice(-49), takeSnapshot(state)];
         if (action.type === "START") {
           if (state.phase !== "ready") return state;
           if (game.engine === "speed") {
-            if (state.currentGameId === "charades") {
+            if ((settings.previewDurationSec ?? 0) > 0) {
               const duration = (settings.previewDurationSec ?? 3) * 1000;
               return { phase: "preview", phaseTimerStatus: "running", phaseRemainingMs: duration, phaseDeadline: now + duration, history };
             }
@@ -254,14 +265,20 @@ export const useSessionStore = create<SessionStore>()(
         if (action.type === "END") return { screen: "round_result", phase: "revealed", roundTimerStatus: "paused", roundDeadline: null, phaseTimerStatus: "paused", phaseDeadline: null, roundNumber: state.roundNumber + 1, history };
         return state;
       }),
+      dispatchModuleAction: (action) => set((state) => {
+        if (!state.currentGameId) return state;
+        const history = [...state.history.slice(-49), takeSnapshot(state)];
+        return { moduleRuntime: reduceNewGameRuntime(state.currentGameId, state.moduleRuntime, action), history };
+      }),
       tick: (now) => set((state) => {
         if (!state.currentGameId) return state;
-        const game = gameRegistry[state.currentGameId];
+        const game = playableGameRegistry[state.currentGameId];
         if (state.phaseTimerStatus === "running" && state.phaseDeadline !== null) {
           const remaining = Math.max(0, state.phaseDeadline - now);
           if (remaining > 0) return { phaseRemainingMs: remaining };
           if (state.phase === "preview") return { phase: "active", phaseTimerStatus: "idle", phaseRemainingMs: 0, phaseDeadline: null,
-            roundTimerStatus: "running", roundDeadline: now + state.roundRemainingMs };
+            roundTimerStatus: "running", roundDeadline: now + state.roundRemainingMs,
+            moduleRuntime: reduceNewGameRuntime(state.currentGameId, state.moduleRuntime, { type: "HIDE_FORBIDDEN" }) };
           if (game.engine === "progressive") return advanceStage(state, now);
           return { phase: "attempt", phaseTimerStatus: "expired", phaseRemainingMs: 0, phaseDeadline: null };
         }
@@ -276,21 +293,21 @@ export const useSessionStore = create<SessionStore>()(
       newSession: () => {
         const teams = createTeams();
         set({ sessionId: crypto.randomUUID(), screen: "session_setup", teams,
-          selectedGameIds: [...Object.keys(gameRegistry)] as MvpGameType[], currentGameId: null,
+          selectedGameIds: availableGameDefinitions.map((game) => game.id), currentGameId: null,
           currentTeamId: teams[0].id, settingsByGame: defaultSettings(), filter: { ...defaultFilter },
-          questionQueue: [], questionIndex: 0, stageIndex: 0, roundNumber: 1, usedQuestionIds: [],
+          questionQueue: [], questionStageCounts: {}, questionIndex: 0, stageIndex: 0, roundNumber: 1, usedQuestionIds: [],
           phase: "ready", attemptingTeamId: null, lockedTeamIds: [],
           roundTimerStatus: "idle", roundRemainingMs: 0, roundDeadline: null,
-          phaseTimerStatus: "idle", phaseRemainingMs: 0, phaseDeadline: null, roundScores: {}, history: [] });
+          phaseTimerStatus: "idle", phaseRemainingMs: 0, phaseDeadline: null, roundScores: {}, moduleRuntime: {}, history: [] });
       },
     }),
     {
-      name: "party-quiz-session", version: 5,
+      name: "party-quiz-session", version: 6,
       migrate: (persisted) => {
         const previous = (persisted ?? {}) as Partial<SessionStore>;
         const defaults = defaultSettings();
         const teams = previous.teams ?? createTeams();
-        const settingsByGame = Object.fromEntries(Object.entries(defaults).map(([id, value]) => [id, { ...value, ...(previous.settingsByGame?.[id as MvpGameType] ?? {}) }])) as Record<MvpGameType, GameSettings>;
+        const settingsByGame = Object.fromEntries(Object.entries(defaults).map(([id, value]) => [id, { ...value, ...(previous.settingsByGame?.[id as GameType] ?? {}) }])) as Record<GameType, GameSettings>;
         settingsByGame.football_career = {
           ...settingsByGame.football_career,
           stageCount: 1,
@@ -302,8 +319,9 @@ export const useSessionStore = create<SessionStore>()(
           sessionId: previous.sessionId ?? crypto.randomUUID(),
           screen: previous.screen === "game_play" ? "game_setup" : (previous.screen ?? "home"),
           teams,
-          selectedGameIds: previous.selectedGameIds ?? ([...Object.keys(gameRegistry)] as MvpGameType[]),
-          currentGameId: previous.currentGameId ?? null,
+          selectedGameIds: (previous.selectedGameIds ?? availableGameDefinitions.map((game) => game.id))
+            .filter((gameId) => availableGameDefinitions.some((game) => game.id === gameId)),
+          currentGameId: previous.currentGameId && playableGameRegistry[previous.currentGameId] ? previous.currentGameId : null,
           currentTeamId: previous.currentTeamId ?? teams[0].id,
           settingsByGame,
           filter: { ...defaultFilter, ...(previous.filter ?? {}) },

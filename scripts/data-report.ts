@@ -1,8 +1,8 @@
 import { scanData } from "./data-utils";
-import type { MvpQuestion } from "../src/domain/types";
+import type { PlayableQuestion } from "../src/domain/types";
 
 const result = scanData();
-const byGame = result.questions.reduce<Record<string, MvpQuestion[]>>((groups, question) => {
+const byGame = result.questions.reduce<Record<string, PlayableQuestion[]>>((groups, question) => {
   (groups[question.gameType] ??= []).push(question);
   return groups;
 }, {});
@@ -15,7 +15,7 @@ for (const [gameType, gameQuestions] of Object.entries(byGame)) {
   const verified = questions.filter((question) => question.verified).length;
   const difficulties = [1, 2, 3, 4, 5].map((level) => questions.filter((question) => question.difficulty === level).length).join("/");
   const categories = new Set(questions.map((question) => question.category)).size;
-  const privateOnly = questions.filter((question) => question.usageScope === "private_only").length;
+  const privateOnly = questions.filter((question) => "usageScope" in question && question.usageScope === "private_only").length;
   console.log(`${gameType.padEnd(22)} 전체 ${String(questions.length).padStart(3)} | 활성 ${String(enabled).padStart(3)} | 검증 ${String(verified).padStart(3)} | 로컬 ${String(privateOnly).padStart(2)} | 난이도 ${difficulties} | 분류 ${categories}`);
 }
 console.log("-----------------------");

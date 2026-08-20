@@ -14,7 +14,7 @@ test("관리자 페이지에서 게임별 데이터와 로컬 전용 문제를 �
   await page.goto("/");
   await page.getByRole("button", { name: "문제 데이터 관리" }).click();
   await expect(page.getByRole("heading", { name: "문제 데이터 관리" })).toBeVisible();
-  await expect(page.getByLabel("데이터 현황")).toContainText("684");
+  await expect(page.getByLabel("데이터 현황")).toContainText("로드 오류0");
   await page.getByLabel("관리 이용 범위").selectOption("private");
   await expect(page.getByText("44개 표시")).toBeVisible();
   await page.getByLabel("문항 검색").fill("피카츄");
@@ -103,4 +103,41 @@ test("선수 커리어는 전체 경력을 한 번에 공개하고 정답에 1�
   await page.getByRole("complementary", { name: "도전 판정" }).getByRole("button", { name: "정답" }).click();
   await expect(page.locator(".score-team").filter({ hasText: "A팀" })).toContainText("1");
   await expect(page.getByText("콘텐츠 출처·라이선스")).toBeVisible();
+});
+
+test("통합된 로고 확대 게임을 실행하고 세션을 복원한다", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "새 게임 시작" }).click();
+  await page.getByLabel("1번 팀 이름").fill("로고팀");
+  await page.getByRole("button", { name: "게임 선택" }).click();
+
+  await expect(page.getByRole("heading", { name: "음악 전주" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "이미지 확대" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "로고 확대 퀴즈" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "영화 포스터" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "노래 그림" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "설명 금지어" })).toHaveCount(0);
+
+  const logoCard = page.locator("article").filter({ hasText: "로고 확대 퀴즈" });
+  await logoCard.getByRole("button", { name: "게임 안내" }).click();
+  await expect(page.getByText(/로고의 좁은 영역부터/)).toBeVisible();
+  await page.getByRole("button", { name: "게임 설정" }).click();
+  await expect(page.getByText(/개 문제 사용 가능/)).toBeVisible();
+  await page.getByRole("button", { name: "라운드 시작" }).click();
+
+  await expect(page.getByText("문제가 아직 공개되지 않았습니다")).toBeVisible();
+  await expect(page.getByRole("img", { name: /로고 1단계/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "문제 공개 · 시작" }).click();
+  await expect(page.getByRole("img", { name: /로고 1단계/ })).toBeVisible();
+  await page.getByRole("button", { name: "다음 단계" }).click();
+  await expect(page.getByRole("img", { name: /로고 2단계/ })).toBeVisible();
+  await page.getByRole("button", { name: "로고팀 도전" }).click();
+  await page.getByRole("button", { name: "정답", exact: true }).click();
+  await expect(page.locator(".score-team").filter({ hasText: "로고팀" })).toContainText("2");
+  await page.getByRole("button", { name: "실행 취소" }).click();
+  await expect(page.locator(".score-team").filter({ hasText: "로고팀" })).toContainText("0");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "로고 확대 퀴즈" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "라운드 시작" })).toBeVisible();
 });

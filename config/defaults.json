@@ -11,16 +11,16 @@
   },
   "games": {
     "person_quiz": { "answerMode": "host", "roundDurationSec": 60, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "END_QUESTION" },
-    "music_intro": { "stageDurationSec": 5, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "music_intro": { "answerMode": "host", "roundQuestionCount": 5, "stageDurationSec": 5, "stageCount": 3, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "LOCK_CURRENT_STAGE" },
     "charades": { "answerMode": "host", "roundDurationSec": 60, "previewDurationSec": 3, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "END_QUESTION" },
     "four_syllable": { "answerMode": "host", "roundDurationSec": 60, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "END_QUESTION" },
     "three_in_time": { "roundQuestionCount": 10, "questionDurationSec": 5, "requiredCount": 3, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "END_QUESTION" },
-    "zoom_image": { "stageDurationSec": 10, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" },
-    "logo_quiz": { "questionDurationSec": 20, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "STEAL" },
-    "movie_poster": { "questionDurationSec": 20, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "STEAL" },
+    "zoom_image": { "answerMode": "host", "roundQuestionCount": 5, "stageDurationSec": 10, "stageCount": 3, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "LOCK_CURRENT_STAGE" },
+    "logo_quiz": { "answerMode": "host", "roundQuestionCount": 5, "stageDurationSec": 10, "stageCount": 3, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "LOCK_CURRENT_STAGE" },
+    "movie_poster": { "answerMode": "host", "roundQuestionCount": 10, "questionDurationSec": 20, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "END_QUESTION" },
     "progressive_hint": { "answerMode": "host", "roundQuestionCount": 5, "stageDurationSec": 15, "stageCount": 3, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "LOCK_CURRENT_STAGE" },
-    "song_drawing": { "stageDurationSec": 15, "stageScores": [3, 2, 1], "allowPass": false, "wrongAnswerPolicy": "STEAL" },
-    "taboo": { "roundDurationSec": 60, "previewDurationSec": 5, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "HOST_DECIDES" },
+    "song_drawing": { "answerMode": "host", "roundQuestionCount": 10, "questionDurationSec": 25, "scoreOnSuccess": 1, "allowPass": false, "wrongAnswerPolicy": "END_QUESTION" },
+    "taboo": { "answerMode": "host", "roundDurationSec": 60, "previewDurationSec": 5, "scorePerCorrect": 1, "allowPass": true, "wrongAnswerPolicy": "END_QUESTION" },
     "football_career": { "answerMode": "host", "roundQuestionCount": 5, "stageDurationSec": 20, "stageCount": 1, "stageScores": [1], "allowPass": false, "wrongAnswerPolicy": "LOCK_CURRENT_STAGE" }
   }
 }

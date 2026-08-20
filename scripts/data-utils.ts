@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
-import type { MvpQuestion } from "../src/domain/types";
+import type { MvpQuestion, PlayableQuestion } from "../src/domain/types";
 import { MVP_GAME_TYPES } from "../src/domain/types";
 import { questionSchema } from "../src/data/schema";
 
@@ -11,7 +11,7 @@ export interface DataIssue {
 }
 
 export interface DataScanResult {
-  questions: MvpQuestion[];
+  questions: PlayableQuestion[];
   issues: DataIssue[];
   files: string[];
 }
@@ -31,7 +31,7 @@ function normalize(value: string): string {
 export function scanData(projectRoot = resolve(import.meta.dirname, "..")): DataScanResult {
   const dataRoot = join(projectRoot, "data");
   const files = jsonFiles(dataRoot);
-  const questions: MvpQuestion[] = [];
+  const questions: PlayableQuestion[] = [];
   const issues: DataIssue[] = [];
   const ids = new Map<string, string>();
   const fingerprints = new Map<string, string>();
@@ -59,7 +59,7 @@ export function scanData(projectRoot = resolve(import.meta.dirname, "..")): Data
         }
         return;
       }
-      const question = result.data as MvpQuestion;
+      const question = result.data as PlayableQuestion;
       questions.push(question);
 
       const existingId = ids.get(question.id);
@@ -128,7 +128,7 @@ export function scanData(projectRoot = resolve(import.meta.dirname, "..")): Data
     });
   }
 
-  const people = questions.filter((question) => question.gameType === "person_quiz");
+  const people = questions.filter((question): question is Extract<MvpQuestion, { gameType: "person_quiz" }> => question.gameType === "person_quiz");
   if (people.some((question) => !question.asset || !question.attribution || !question.sources?.length)) issues.push({ file: "data", message: "모든 인물 문항에는 로컬 이미지·라이선스·출처가 필요합니다." });
 
   return { questions, issues, files };
