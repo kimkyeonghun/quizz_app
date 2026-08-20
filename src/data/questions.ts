@@ -1,12 +1,12 @@
-import type { MvpQuestion } from "../domain/types";
-import { mvpQuestionSchema } from "./schema";
+import type { PlayableQuestion, PlayableGameType } from "../domain/types";
+import { questionSchema } from "./schema";
 
 const modules = import.meta.glob("/data/**/*.json", {
   eager: true,
   import: "default",
 }) as Record<string, unknown>;
 
-const parsedQuestions: MvpQuestion[] = [];
+const parsedQuestions: PlayableQuestion[] = [];
 const loadErrors: string[] = [];
 
 for (const [path, content] of Object.entries(modules)) {
@@ -16,9 +16,9 @@ for (const [path, content] of Object.entries(modules)) {
   }
 
   content.forEach((item, index) => {
-    const result = mvpQuestionSchema.safeParse(item);
+    const result = questionSchema.safeParse(item);
     if (result.success) {
-      parsedQuestions.push(result.data as MvpQuestion);
+      parsedQuestions.push(result.data as PlayableQuestion);
     } else {
       loadErrors.push(`${path}[${index}]: ${result.error.issues.map((issue) => issue.message).join(", ")}`);
     }
@@ -28,6 +28,6 @@ for (const [path, content] of Object.entries(modules)) {
 export const questions = parsedQuestions;
 export const questionLoadErrors = loadErrors;
 
-export function questionsForGame(gameType: string): MvpQuestion[] {
+export function questionsForGame(gameType: PlayableGameType): PlayableQuestion[] {
   return questions.filter((question) => question.gameType === gameType);
 }

@@ -1,4 +1,4 @@
-import type { FilterSettings, MvpQuestion } from "../domain/types";
+import type { BaseQuestion, FilterSettings } from "../domain/types";
 
 export function shuffle<T>(items: T[], random = Math.random): T[] {
   const result = [...items];
@@ -9,11 +9,11 @@ export function shuffle<T>(items: T[], random = Math.random): T[] {
   return result;
 }
 
-export function filterQuestions(
-  questions: MvpQuestion[],
+export function filterQuestions<Question extends BaseQuestion>(
+  questions: Question[],
   filter: FilterSettings,
   usedQuestionIds: string[],
-): MvpQuestion[] {
+): Question[] {
   const used = new Set(usedQuestionIds);
   const filtered = questions.filter((question) => {
     if (!question.enabled) return false;

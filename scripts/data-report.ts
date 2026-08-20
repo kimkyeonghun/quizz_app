@@ -1,8 +1,8 @@
 import { scanData } from "./data-utils";
-import type { MvpQuestion } from "../src/domain/types";
+import type { PlayableQuestion } from "../src/domain/types";
 
 const result = scanData();
-const byGame = result.questions.reduce<Record<string, MvpQuestion[]>>((groups, question) => {
+const byGame = result.questions.reduce<Record<string, PlayableQuestion[]>>((groups, question) => {
   (groups[question.gameType] ??= []).push(question);
   return groups;
 }, {});

@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
-import type { MvpQuestion } from "../src/domain/types";
+import type { PlayableQuestion } from "../src/domain/types";
 import { questionSchema } from "../src/data/schema";
 
 export interface DataIssue {
@@ -10,7 +10,7 @@ export interface DataIssue {
 }
 
 export interface DataScanResult {
-  questions: MvpQuestion[];
+  questions: PlayableQuestion[];
   issues: DataIssue[];
   files: string[];
 }
@@ -30,7 +30,7 @@ function normalize(value: string): string {
 export function scanData(projectRoot = resolve(import.meta.dirname, "..")): DataScanResult {
   const dataRoot = join(projectRoot, "data");
   const files = jsonFiles(dataRoot);
-  const questions: MvpQuestion[] = [];
+  const questions: PlayableQuestion[] = [];
   const issues: DataIssue[] = [];
   const ids = new Map<string, string>();
   const fingerprints = new Map<string, string>();
@@ -57,7 +57,7 @@ export function scanData(projectRoot = resolve(import.meta.dirname, "..")): Data
         }
         return;
       }
-      const question = result.data as MvpQuestion;
+      const question = result.data as PlayableQuestion;
       questions.push(question);
 
       const existingId = ids.get(question.id);

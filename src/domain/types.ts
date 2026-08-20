@@ -25,6 +25,7 @@ export const MVP_GAME_TYPES = [
 ] as const satisfies readonly GameType[];
 
 export type MvpGameType = (typeof MVP_GAME_TYPES)[number];
+export type PlayableGameType = GameType;
 export type EngineType = "speed" | "standard" | "progressive";
 export type WrongAnswerPolicy =
   | "STEAL"
@@ -141,6 +142,10 @@ export type MvpQuestion =
   | ProgressiveHintQuestion
   | FootballCareerQuestion;
 
+export type { NewGameQuestion as PlayableNewGameQuestion } from "../game-modules/questionSchemas";
+import type { NewGameQuestion } from "../game-modules/questionSchemas";
+export type PlayableQuestion = MvpQuestion | NewGameQuestion;
+
 export type HostAction =
   | { type: "START" }
   | { type: "PAUSE" }
@@ -157,7 +162,7 @@ export type HostAction =
   | { type: "UNDO" };
 
 export interface GameDefinition {
-  id: MvpGameType;
+  id: GameType;
   label: string;
   shortDescription: string;
   engine: EngineType;

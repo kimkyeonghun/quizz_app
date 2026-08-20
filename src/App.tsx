@@ -17,14 +17,15 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { gameDefinitions, gameRegistry } from "./config/gameRegistry";
+import { availableGameDefinitions, getPlayableGameDefinition } from "./adapters/newGames";
+import { getNewGameStageCount, NewGameQuestionContent } from "./adapters/NewGameQuestionContent";
 import { filterQuestions } from "./data/filter";
 import { questionLoadErrors, questions, questionsForGame } from "./data/questions";
 import type {
   FilterSettings,
   GameSettings,
-  MvpGameType,
-  MvpQuestion,
+  GameType,
+  PlayableQuestion,
 } from "./domain/types";
 import { useGameTimer } from "./hooks/useGameTimer";
 import { useSessionStore } from "./store/sessionStore";
@@ -92,7 +93,7 @@ function HomeScreen() {
         </div>
       </section>
       <section className="status-strip" aria-label="앱 상태">
-        <span>6개 게임</span>
+        <span>{availableGameDefinitions.length}개 게임</span>
         <span>2~4팀</span>
         <span>오프라인 플레이</span>
         <span>Undo 지원</span>
@@ -182,7 +183,7 @@ function GameSelectScreen() {
         </div>
       )}
       <section className="game-grid">
-        {gameDefinitions.map((game, index) => {
+        {availableGameDefinitions.map((game, index) => {
           const count = questionsForGame(game.id).length;
           const selected = selectedGameIds.includes(game.id);
           return (
@@ -225,7 +226,7 @@ function GameIntroScreen() {
   const setScreen = useSessionStore((state) => state.setScreen);
 
   if (!currentGameId) return null;
-  const game = gameRegistry[currentGameId];
+  const game = getPlayableGameDefinition(currentGameId);
 
   return (
     <ScreenFrame title={game.label} subtitle="게임을 시작하기 전에 진행 방식을 확인하세요.">
@@ -281,7 +282,7 @@ function GameSetupScreen() {
   const clearUsedQuestions = useSessionStore((state) => state.clearUsedQuestions);
 
   if (!currentGameId) return null;
-  const game = gameRegistry[currentGameId];
+  const game = getPlayableGameDefinition(currentGameId);
   const settings = settingsByGame[currentGameId];
   const gameQuestions = questionsForGame(currentGameId);
   const categories = [...new Set(gameQuestions.map((question) => question.category))].sort();
@@ -327,7 +328,10 @@ function GameSetupScreen() {
           variant="primary"
           icon={<Play size={20} />}
           disabled={queue.length === 0}
-          onClick={() => startRound(queue.map((question) => question.id))}
+          onClick={() => startRound(
+            queue.map((question) => question.id),
+            Object.fromEntries(queue.map((question) => [question.id, getNewGameStageCount(question)])),
+          )}
         >
           라운드 시작
         </ActionButton>
@@ -341,11 +345,11 @@ function SettingsFields({
   settings,
   updateSettings,
 }: {
-  gameId: MvpGameType;
+  gameId: GameType;
   settings: GameSettings;
-  updateSettings: (id: MvpGameType, updates: Partial<GameSettings>) => void;
+  updateSettings: (id: GameType, updates: Partial<GameSettings>) => void;
 }) {
-  const game = gameRegistry[gameId];
+  const game = getPlayableGameDefinition(gameId);
   const numericField = (
     key: keyof GameSettings,
     label: string,
@@ -459,9 +463,10 @@ function FilterFields({
 function GamePlayScreen() {
   const state = useSessionStore();
   const dispatch = useSessionStore((store) => store.dispatch);
+  const dispatchModuleAction = useSessionStore((store) => store.dispatchModuleAction);
   const currentQuestionId = state.questionQueue[state.questionIndex];
   const question = questions.find((item) => item.id === currentQuestionId);
-  const game = state.currentGameId ? gameRegistry[state.currentGameId] : null;
+  const game = state.currentGameId ? getPlayableGameDefinition(state.currentGameId) : null;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -510,7 +515,13 @@ function GamePlayScreen() {
 
       <section className="question-stage" style={{ "--accent": game.accent } as React.CSSProperties}>
         <div className="turn-indicator" style={{ color: currentTeam.color }}>{currentTeam.name} 도전</div>
-        <QuestionContent question={question} stageIndex={state.stageIndex} revealed={state.revealed} />
+        <QuestionContent
+          question={question}
+          stageIndex={state.stageIndex}
+          revealed={state.revealed}
+          runtime={state.moduleRuntime}
+          dispatchModuleAction={dispatchModuleAction}
+        />
         {state.revealed && question.answer && (
           <div className="answer-reveal"><span>정답</span><strong>{question.answer}</strong></div>
         )}
@@ -567,7 +578,19 @@ function GamePlayScreen() {
   );
 }
 
-function QuestionContent({ question, stageIndex, revealed }: { question: MvpQuestion; stageIndex: number; revealed: boolean }) {
+function QuestionContent({
+  question,
+  stageIndex,
+  revealed,
+  runtime,
+  dispatchModuleAction,
+}: {
+  question: PlayableQuestion;
+  stageIndex: number;
+  revealed: boolean;
+  runtime: unknown;
+  dispatchModuleAction: (action: unknown) => void;
+}) {
   if (question.gameType === "person_quiz") {
     return (
       <div className="person-question">
@@ -591,7 +614,7 @@ function QuestionContent({ question, stageIndex, revealed }: { question: MvpQues
     const indexes = question.metadata.revealStages[Math.min(stageIndex, question.metadata.revealStages.length - 1)] ?? [];
     return <div className="career-path">{indexes.map((index, itemIndex) => <div key={`${index}-${itemIndex}`}><span>{itemIndex + 1}</span><strong>{question.metadata.career[index]?.club}</strong></div>)}</div>;
   }
-  return null;
+  return <NewGameQuestionContent question={question} stageIndex={stageIndex} revealed={revealed} runtime={runtime} dispatch={dispatchModuleAction} />;
 }
 
 function AssetImage({ src, alt, fallback }: { src?: string | null; alt: string; fallback: string }) {
@@ -611,7 +634,7 @@ function RoundResultScreen() {
   const nextIndex = (teams.findIndex((team) => team.id === currentTeamId) + 1) % teams.length;
 
   return (
-    <ScreenFrame title="라운드 결과" subtitle={currentGameId ? gameRegistry[currentGameId].label : ""}>
+    <ScreenFrame title="라운드 결과" subtitle={currentGameId ? getPlayableGameDefinition(currentGameId).label : ""}>
       <section className="result-list">
         {teams.map((team) => (
           <div key={team.id} style={{ borderLeftColor: team.color }}>

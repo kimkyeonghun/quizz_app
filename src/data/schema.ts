@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { newGameQuestionSchema } from "../game-modules/questionSchemas";
 
 const difficultySchema = z.union([
   z.literal(1),
@@ -92,23 +93,6 @@ export const footballCareerQuestionSchema = z
   })
   .strict();
 
-const futureGameTypeSchema = z.enum([
-  "music_intro",
-  "zoom_image",
-  "logo_quiz",
-  "movie_poster",
-  "song_drawing",
-  "taboo",
-]);
-
-const futureQuestionSchema = z
-  .object({
-    ...commonShape,
-    gameType: futureGameTypeSchema,
-    metadata: z.record(z.string(), z.unknown()).optional(),
-  })
-  .strict();
-
 export const mvpQuestionSchema = z.discriminatedUnion("gameType", [
   personQuestionSchema,
   charadesQuestionSchema,
@@ -118,7 +102,7 @@ export const mvpQuestionSchema = z.discriminatedUnion("gameType", [
   footballCareerQuestionSchema,
 ]);
 
-export const questionSchema = z.union([mvpQuestionSchema, futureQuestionSchema]);
+export const questionSchema = z.union([mvpQuestionSchema, newGameQuestionSchema]);
 export const questionFileSchema = z.array(questionSchema);
 
 export type ValidatedQuestion = z.infer<typeof questionSchema>;
