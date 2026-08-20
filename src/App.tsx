@@ -1,16 +1,22 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   BookOpen,
   Check,
+  ChevronLeft,
+  ChevronRight,
+  Database,
   Expand,
   Eye,
   Flag,
   Lightbulb,
   ListChecks,
+  MonitorUp,
   Pause,
   Play,
   RotateCcw,
+  Search,
   Settings,
   SkipForward,
   Trophy,
@@ -26,6 +32,7 @@ import type {
   MvpGameType,
   MvpQuestion,
 } from "./domain/types";
+import { answerMatchesQuestion } from "./domain/answerMatching";
 import { useGameTimer } from "./hooks/useGameTimer";
 import { useSessionStore } from "./store/sessionStore";
 
@@ -55,6 +62,7 @@ function App() {
   return (
     <div className="app-shell">
       {screen === "home" && <HomeScreen />}
+      {screen === "data_admin" && <DataAdminScreen />}
       {screen === "session_setup" && <SessionSetupScreen />}
       {screen === "game_select" && <GameSelectScreen />}
       {screen === "game_intro" && <GameIntroScreen />}
@@ -84,6 +92,9 @@ function HomeScreen() {
           <ActionButton variant="primary" icon={<Play size={22} />} onClick={newSession}>
             새 게임 시작
           </ActionButton>
+          <ActionButton icon={<Database size={20} />} onClick={() => setScreen("data_admin")}>
+            문제 데이터 관리
+          </ActionButton>
           {hasProgress && (
             <ActionButton icon={<RotateCcw size={20} />} onClick={() => setScreen("game_select")}>
               진행 중인 세션
@@ -99,6 +110,135 @@ function HomeScreen() {
       </section>
     </main>
   );
+}
+
+function DataAdminScreen() {
+  const setScreen = useSessionStore((state) => state.setScreen);
+  const [gameId, setGameId] = useState<MvpGameType>("person_quiz");
+  const [query, setQuery] = useState("");
+  const [difficulty, setDifficulty] = useState("all");
+  const [category, setCategory] = useState("all");
+  const [scope, setScope] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+  const gameQuestions = questionsForGame(gameId);
+  const categories = [...new Set(gameQuestions.map((question) => question.category))].sort();
+  const normalizedQuery = query.normalize("NFC").trim().toLocaleLowerCase("ko-KR");
+  const filtered = gameQuestions.filter((question) => {
+    if (difficulty !== "all" && question.difficulty !== Number(difficulty)) return false;
+    if (category !== "all" && question.category !== category) return false;
+    if (scope === "private" && question.usageScope !== "private_only") return false;
+    if (scope === "redistributable" && question.usageScope === "private_only") return false;
+    if (!normalizedQuery) return true;
+    const searchable = [question.id, question.answer ?? "", ...(question.acceptedAnswers ?? []), question.category,
+      questionPrompt(question), JSON.stringify(question.metadata ?? {})].join(" ").normalize("NFC").toLocaleLowerCase("ko-KR");
+    return searchable.includes(normalizedQuery);
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageQuestions = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const totalPrivate = questions.filter((question) => question.usageScope === "private_only").length;
+
+  const changeGame = (nextGameId: MvpGameType) => {
+    setGameId(nextGameId); setQuery(""); setDifficulty("all"); setCategory("all"); setScope("all"); setPage(1);
+  };
+
+  return <main className="admin-screen">
+    <header className="admin-heading">
+      <div><p className="eyebrow">DATA ADMIN</p><h1>문제 데이터 관리</h1><p>게임별 문항, 정답, 메타데이터와 출처를 확인합니다.</p></div>
+      <ActionButton icon={<ArrowLeft size={20} />} onClick={() => setScreen("home")}>홈으로</ActionButton>
+    </header>
+
+    <section className="admin-overview" aria-label="데이터 현황">
+      <div><span>전체 문항</span><strong>{questions.length}</strong></div>
+      <div><span>활성·검수</span><strong>{questions.filter((question) => question.enabled && question.verified).length}</strong></div>
+      <div><span>로컬 전용</span><strong>{totalPrivate}</strong></div>
+      <div className={questionLoadErrors.length ? "has-errors" : ""}><span>로드 오류</span><strong>{questionLoadErrors.length}</strong></div>
+    </section>
+
+    <nav className="admin-game-tabs" aria-label="게임별 데이터">
+      {gameDefinitions.map((game) => {
+        const count = questionsForGame(game.id).length;
+        return <button key={game.id} aria-label={`${game.label} ${count}문항`} className={gameId === game.id ? "active" : ""} style={{ "--tab-accent": game.accent } as React.CSSProperties}
+          onClick={() => changeGame(game.id)}><span>{game.label}</span><strong>{count}</strong></button>;
+      })}
+    </nav>
+
+    <section className="admin-toolbar" aria-label="문항 필터">
+      <label className="admin-search"><Search size={18} /><input aria-label="문항 검색" value={query} placeholder="ID, 문제, 정답, 별칭 검색"
+        onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
+      <label><span>난이도</span><select aria-label="관리 난이도" value={difficulty} onChange={(event) => { setDifficulty(event.target.value); setPage(1); }}>
+        <option value="all">전체</option>{[1, 2, 3, 4, 5].map((level) => <option key={level} value={level}>{level}</option>)}
+      </select></label>
+      <label><span>분류</span><select aria-label="관리 분류" value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }}>
+        <option value="all">전체</option>{categories.map((item) => <option key={item} value={item}>{item}</option>)}
+      </select></label>
+      <label><span>이용 범위</span><select aria-label="관리 이용 범위" value={scope} onChange={(event) => { setScope(event.target.value); setPage(1); }}>
+        <option value="all">전체</option><option value="redistributable">재배포 가능</option><option value="private">로컬 전용</option>
+      </select></label>
+    </section>
+
+    <div className="admin-list-heading"><div><strong>{gameRegistry[gameId].label}</strong><span>{filtered.length}개 표시</span></div><span>행을 열어 전체 데이터와 출처를 확인하세요.</span></div>
+    <section className="admin-question-list" aria-label={`${gameRegistry[gameId].label} 문제 목록`}>
+      {pageQuestions.length ? pageQuestions.map((question, index) => <AdminQuestionRow key={question.id} question={question} number={(safePage - 1) * pageSize + index + 1} />)
+        : <div className="admin-empty"><Search size={34} /><strong>조건에 맞는 문항이 없습니다.</strong></div>}
+    </section>
+
+    <footer className="admin-pagination">
+      <button aria-label="이전 페이지" disabled={safePage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}><ChevronLeft size={20} /></button>
+      <span>{safePage} / {totalPages}</span>
+      <button aria-label="다음 페이지" disabled={safePage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}><ChevronRight size={20} /></button>
+    </footer>
+  </main>;
+}
+
+function AdminQuestionRow({ question, number }: { question: MvpQuestion; number: number }) {
+  return <details className="admin-question-row">
+    <summary>
+      <span className="admin-row-number">{number}</span>
+      {question.asset ? <img src={`${import.meta.env.BASE_URL}${question.asset.replace(/^\//, "")}`} alt="" /> : <span className="admin-no-asset">TEXT</span>}
+      <span className="admin-row-main"><small>{question.id}</small><strong>{questionPrompt(question)}</strong></span>
+      <span className="admin-row-answer"><small>정답</small><strong>{questionAnswer(question)}</strong></span>
+      <span className="admin-row-meta"><em>난이도 {question.difficulty}</em><em>{question.category}</em>
+        {question.usageScope === "private_only" && <em className="private">로컬 전용</em>}</span>
+    </summary>
+    <div className="admin-question-detail">
+      <section><h3>문항 데이터</h3><QuestionMetadata question={question} />
+        {question.acceptedAnswers?.length ? <p><strong>허용 답안</strong>{question.acceptedAnswers.join(" · ")}</p> : null}
+        {question.tags?.length ? <p><strong>태그</strong>{question.tags.join(" · ")}</p> : null}
+      </section>
+      <section><h3>출처·권한</h3>
+        {question.attribution && <p><strong>이미지</strong><a href={question.attribution.sourceUrl} target="_blank" rel="noreferrer">원본 페이지</a> · {question.attribution.license} · {question.attribution.accessedAt}</p>}
+        {question.sources?.map((source) => <p key={source.url}><strong>{source.publisher}</strong><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> · {source.accessedAt}</p>)}
+        {!question.attribution && !question.sources?.length && !question.source && <p className="admin-muted">등록된 외부 출처가 없는 자체 작성 문항입니다.</p>}
+        {question.source && !question.sources?.length && <p><a href={question.source} target="_blank" rel="noreferrer">문항 출처</a></p>}
+      </section>
+    </div>
+  </details>;
+}
+
+function QuestionMetadata({ question }: { question: MvpQuestion }) {
+  if (question.gameType === "person_quiz") return <p><strong>힌트</strong>{question.metadata?.clue ?? "없음"}</p>;
+  if (question.gameType === "charades") return <p><strong>제시어</strong>{question.answer}</p>;
+  if (question.gameType === "four_syllable") return <p><strong>앞말 / 완성어</strong>{question.metadata.prompt} / {question.metadata.fullAnswer}</p>;
+  if (question.gameType === "three_in_time") return <><p><strong>판정 예시</strong>{question.metadata.examples.join(" · ")}</p><p><strong>판정 기준</strong>{question.metadata.judgingNotes}</p></>;
+  if (question.gameType === "progressive_hint") return <ol className="admin-stage-list">{question.metadata.hints.map((hint) => <li key={hint}>{hint}</li>)}</ol>;
+  return <ol className="admin-stage-list">{question.metadata.career.map((entry) => <li key={`${entry.order}-${entry.club}`}>{entry.club}</li>)}</ol>;
+}
+
+function questionPrompt(question: MvpQuestion): string {
+  if (question.gameType === "person_quiz") return question.metadata?.clue ?? "인물 이미지";
+  if (question.gameType === "charades") return question.answer;
+  if (question.gameType === "four_syllable") return `${question.metadata.prompt}··`;
+  if (question.gameType === "three_in_time") return question.metadata.prompt;
+  if (question.gameType === "progressive_hint") return question.metadata.hints[0];
+  return question.metadata.career.map((entry) => entry.club).join(" → ");
+}
+
+function questionAnswer(question: MvpQuestion): string {
+  if (question.gameType === "three_in_time") return "사회자 판정";
+  if (question.gameType === "four_syllable") return question.metadata.fullAnswer;
+  return question.answer ?? "-";
 }
 
 function SessionSetupScreen() {
@@ -214,6 +354,7 @@ function GameSelectScreen() {
       </section>
       <footer className="screen-footer">
         <ActionButton icon={<Users size={20} />} onClick={() => setScreen("session_setup")}>팀 수정</ActionButton>
+        <ActionButton icon={<Database size={20} />} onClick={() => setScreen("data_admin")}>문제 데이터 관리</ActionButton>
         <ActionButton icon={<Trophy size={20} />} onClick={() => setScreen("scoreboard")}>점수판</ActionButton>
       </footer>
     </ScreenFrame>
@@ -286,25 +427,26 @@ function GameSetupScreen() {
   const gameQuestions = questionsForGame(currentGameId);
   const categories = [...new Set(gameQuestions.map((question) => question.category))].sort();
   const queue = filterQuestions(gameQuestions, filter, usedQuestionIds);
+  const requiredQuestions = game.engine === "speed" ? 1 : (settings.roundQuestionCount ?? (game.engine === "standard" ? 10 : 5));
+  const insufficientQuestions = queue.length < requiredQuestions;
+  const invalidSettings = !settingsAreValid(currentGameId, settings);
 
   return (
     <ScreenFrame title={game.label} subtitle={game.shortDescription}>
       <section className="setup-columns">
         <div className="settings-panel">
           <h2>라운드 설정</h2>
-          <label className="field-label">도전 팀</label>
-          <div className="team-segments">
-            {teams.map((team) => (
-              <button
-                key={team.id}
-                className={currentTeamId === team.id ? "active" : ""}
-                style={{ "--team-color": team.color } as React.CSSProperties}
-                onClick={() => selectTeam(team.id)}
-              >
-                {team.name}
-              </button>
-            ))}
-          </div>
+          {game.engine !== "progressive" && <>
+            <label className="field-label">도전 팀</label>
+            <div className="team-segments">
+              {teams.map((team) => (
+                <button key={team.id} className={currentTeamId === team.id ? "active" : ""}
+                  style={{ "--team-color": team.color } as React.CSSProperties} onClick={() => selectTeam(team.id)}>
+                  {team.name}
+                </button>
+              ))}
+            </div>
+          </>}
           <SettingsFields gameId={currentGameId} settings={settings} updateSettings={updateSettings} />
         </div>
         <div className="settings-panel">
@@ -314,9 +456,10 @@ function GameSetupScreen() {
             <strong>{queue.length}</strong>
             <span>개 문제 사용 가능</span>
           </div>
-          {queue.length === 0 && (
-            <p className="inline-error">조건에 맞는 문제가 없습니다. 필터 또는 사용 기록을 조정하세요.</p>
+          {insufficientQuestions && (
+            <p className="inline-error">라운드에 필요한 {requiredQuestions}문항보다 적습니다. 필터 또는 사용 기록을 조정하세요.</p>
           )}
+          {invalidSettings && <p className="inline-error">고급 설정 값이 허용 범위를 벗어났습니다.</p>}
           <button className="text-button" onClick={clearUsedQuestions}>사용 기록 초기화</button>
         </div>
       </section>
@@ -326,7 +469,7 @@ function GameSetupScreen() {
         <ActionButton
           variant="primary"
           icon={<Play size={20} />}
-          disabled={queue.length === 0}
+          disabled={insufficientQuestions || invalidSettings}
           onClick={() => startRound(queue.map((question) => question.id))}
         >
           라운드 시작
@@ -334,6 +477,26 @@ function GameSetupScreen() {
       </footer>
     </ScreenFrame>
   );
+}
+
+function settingsAreValid(gameId: MvpGameType, settings: GameSettings): boolean {
+  const game = gameRegistry[gameId];
+  if (game.engine === "speed") {
+    if ((settings.roundDurationSec ?? 0) < 10 || (settings.roundDurationSec ?? 0) > 600) return false;
+    if ((settings.scorePerCorrect ?? 0) < 1 || (settings.scorePerCorrect ?? 0) > 100) return false;
+    if (gameId === "charades" && ((settings.previewDurationSec ?? 0) < 1 || (settings.previewDurationSec ?? 0) > 10)) return false;
+    return true;
+  }
+  if ((settings.roundQuestionCount ?? 0) < 1 || (settings.roundQuestionCount ?? 0) > 30) return false;
+  if (game.engine === "standard") {
+    return (settings.questionDurationSec ?? 0) >= 3 && (settings.questionDurationSec ?? 0) <= 15
+      && (settings.requiredCount ?? 0) >= 2 && (settings.requiredCount ?? 0) <= 5
+      && (settings.scoreOnSuccess ?? 0) >= 1 && (settings.scoreOnSuccess ?? 0) <= 100;
+  }
+  const scores = settings.stageScores;
+  return (settings.stageDurationSec ?? 0) >= 3 && (settings.stageDurationSec ?? 0) <= 120
+    && scores !== undefined && scores.length === settings.stageCount
+    && scores.every((score) => score >= 0 && score <= 100);
 }
 
 function SettingsFields({
@@ -366,51 +529,39 @@ function SettingsFields({
 
   return (
     <div className="field-stack">
-      {game.engine === "speed" && numericField("roundDurationSec", "라운드 시간 (초)", 10, 600)}
-      {game.engine === "standard" && numericField("questionDurationSec", "문제 시간 (초)", 1, 120)}
-      {game.engine === "progressive" && numericField("stageDurationSec", "힌트별 시간 (초)", 1, 120)}
-      {game.engine === "speed" && numericField("scorePerCorrect", "정답 점수", 1, 100)}
-      {game.engine === "standard" && numericField("scoreOnSuccess", "성공 점수", 1, 100)}
-      {gameId === "three_in_time" && numericField("requiredCount", "필요 답변 수", 1, 10)}
-      {game.engine === "progressive" && (
-        <label className="number-field number-field--wide">
-          <span>단계별 점수</span>
-          <input
-            value={(settings.stageScores ?? [3, 2, 1]).join(", ")}
-            onChange={(event) => {
-              const values = event.target.value
-                .split(",")
-                .map((value) => Number(value.trim()))
-                .filter((value) => Number.isFinite(value) && value >= 0);
-              if (values.length) updateSettings(gameId, { stageScores: values });
-            }}
-          />
-        </label>
-      )}
-      <label className="select-field">
-        <span>오답 처리</span>
-        <select
-          value={settings.wrongAnswerPolicy}
-          onChange={(event) => updateSettings(gameId, {
-            wrongAnswerPolicy: event.target.value as GameSettings["wrongAnswerPolicy"],
-          })}
-        >
-          <option value="STEAL">상대팀 기회</option>
-          <option value="RETRY_SAME_TEAM">같은 팀 재도전</option>
-          <option value="END_QUESTION">문제 종료</option>
-          <option value="HOST_DECIDES">사회자가 선택</option>
-        </select>
-      </label>
-      {(game.engine === "speed") && (
-        <label className="toggle-control">
-          <input
-            type="checkbox"
-            checked={settings.allowPass ?? false}
-            onChange={(event) => updateSettings(gameId, { allowPass: event.target.checked })}
-          />
-          패스 허용
-        </label>
-      )}
+      <div className="recommended-rules">
+        <strong>권장 규칙 적용 중</strong>
+        <span>{game.engine === "speed" ? `${settings.roundDurationSec}초 속도전` : `${settings.roundQuestionCount}문제`}</span>
+      </div>
+      {supportsDirectInput(gameId) ? <label className="select-field answer-mode-field"><span>정답 판정 방식</span><select value={settings.answerMode ?? "host"}
+        onChange={(event) => updateSettings(gameId, { answerMode: event.target.value as GameSettings["answerMode"] })}>
+        <option value="host">사회자가 판정</option>
+        <option value="direct_input">참가자가 직접 입력</option>
+      </select></label> : <p className="setting-note">이 게임은 여러 자유 답변을 판정해야 하므로 사회자 판정만 지원합니다.</p>}
+      <details className="advanced-settings">
+        <summary>고급 설정</summary>
+        <div className="field-stack">
+          {game.engine === "speed" && numericField("roundDurationSec", "라운드 시간 (초)", 10, 600)}
+          {game.engine !== "speed" && numericField("roundQuestionCount", "라운드 문제 수", 1, 30)}
+          {game.engine === "standard" && numericField("questionDurationSec", "문제 시간 (초)", 3, 15)}
+          {game.engine === "progressive" && numericField("stageDurationSec", gameId === "football_career" ? "문제 시간 (초)" : "단계별 시간 (초)", 3, 120)}
+          {gameId === "charades" && numericField("previewDurationSec", "설명자 확인 시간 (초)", 1, 10)}
+          {game.engine === "speed" && numericField("scorePerCorrect", "정답 점수", 1, 100)}
+          {game.engine === "standard" && numericField("scoreOnSuccess", "성공 점수", 1, 100)}
+          {gameId === "three_in_time" && numericField("requiredCount", "필요 답변 수", 2, 5)}
+          {game.engine === "progressive" && (settings.stageScores ?? []).map((score, index) => (
+            <label className="number-field" key={index}><span>{gameId === "football_career" ? "정답 점수" : `${index + 1}단계 점수`}</span><input type="number" min="0" max="100" value={score}
+              onChange={(event) => { const scores = [...(settings.stageScores ?? [])]; scores[index] = Number(event.target.value); updateSettings(gameId, { stageScores: scores }); }} /></label>
+          ))}
+          {game.engine === "progressive" && <label className="select-field"><span>오답 처리</span><select value={settings.wrongAnswerPolicy}
+            onChange={(event) => updateSettings(gameId, { wrongAnswerPolicy: event.target.value as GameSettings["wrongAnswerPolicy"] })}>
+            <option value="LOCK_CURRENT_STAGE">현재 단계에서 팀 잠금</option>
+            <option value="END_QUESTION">즉시 문제 종료</option>
+          </select></label>}
+          {game.engine === "speed" && <label className="toggle-control"><input type="checkbox" checked={settings.allowPass ?? false}
+            onChange={(event) => updateSettings(gameId, { allowPass: event.target.checked })} />패스 허용</label>}
+        </div>
+      </details>
     </div>
   );
 }
@@ -452,6 +603,7 @@ function FilterFields({
       </label>
       <label className="toggle-control"><input type="checkbox" checked={filter.verifiedOnly} onChange={(event) => updateFilter({ verifiedOnly: event.target.checked })} />검증된 문제만</label>
       <label className="toggle-control"><input type="checkbox" checked={filter.excludeUsedQuestions} onChange={(event) => updateFilter({ excludeUsedQuestions: event.target.checked })} />사용한 문제 제외</label>
+      <label className="toggle-control"><input type="checkbox" checked={filter.includePrivateQuestions} onChange={(event) => updateFilter({ includePrivateQuestions: event.target.checked })} />로컬 전용 문제 포함</label>
     </div>
   );
 }
@@ -469,23 +621,31 @@ function GamePlayScreen() {
       if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
       if (event.code === "Space") {
         event.preventDefault();
-        dispatch({ type: state.timerStatus === "running" ? "PAUSE" : state.timerStatus === "paused" ? "RESUME" : "START" });
+        const running = state.roundTimerStatus === "running" || state.phaseTimerStatus === "running";
+        const paused = state.roundTimerStatus === "paused" || state.phaseTimerStatus === "paused";
+        dispatch({ type: running ? "PAUSE" : paused ? "RESUME" : "START" });
       } else if (event.key.toLowerCase() === "p") dispatch({ type: "PASS" });
       else if (event.key.toLowerCase() === "n") dispatch({ type: "NEXT" });
       else if (event.key.toLowerCase() === "u") dispatch({ type: "UNDO" });
       else if (/^[1-4]$/.test(event.key)) {
         const team = state.teams[Number(event.key) - 1];
-        if (team) dispatch({ type: "CORRECT", teamId: team.id });
+        if (team) dispatch({ type: game?.engine === "progressive" && state.phase === "active" ? "ATTEMPT" : "CORRECT", teamId: team.id });
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dispatch, state.teams, state.timerStatus]);
+  }, [dispatch, game?.engine, state.phase, state.phaseTimerStatus, state.roundTimerStatus, state.teams]);
 
   if (!game || !question) return null;
   const currentTeam = state.teams.find((team) => team.id === state.currentTeamId) ?? state.teams[0];
-  const totalSeconds = Math.ceil(state.remainingMs / 1000);
+  const isPhaseClock = state.phase === "preview" || game.engine !== "speed";
+  const timerStatus = isPhaseClock ? state.phaseTimerStatus : state.roundTimerStatus;
+  const totalSeconds = Math.ceil((isPhaseClock ? state.phaseRemainingMs : state.roundRemainingMs) / 1000);
   const urgent = totalSeconds <= 10;
+  const settings = state.settingsByGame[game.id];
+  const attemptingTeam = state.teams.find((team) => team.id === state.attemptingTeamId);
+  const canPause = state.roundTimerStatus === "running" || state.phaseTimerStatus === "running";
+  const canResume = state.roundTimerStatus === "paused" || state.phaseTimerStatus === "paused";
 
   return (
     <main className="play-screen">
@@ -502,28 +662,30 @@ function GamePlayScreen() {
           ))}
         </div>
         <div className={urgent ? "timer timer--urgent" : "timer"} aria-live="polite">
-          <span>{state.timerStatus === "expired" ? "TIME" : "남은 시간"}</span>
+          <span>{state.phase === "preview" ? "제시어 확인" : timerStatus === "expired" ? "TIME" : "남은 시간"}</span>
           <strong>{formatTime(totalSeconds)}</strong>
         </div>
+        <HostConsolePortal />
         <button className="icon-button" title="전체 화면" aria-label="전체 화면" onClick={() => document.documentElement.requestFullscreen?.()}><Expand size={22} /></button>
       </header>
 
       <section className="question-stage" style={{ "--accent": game.accent } as React.CSSProperties}>
         <div className="turn-indicator" style={{ color: currentTeam.color }}>{currentTeam.name} 도전</div>
-        <QuestionContent question={question} stageIndex={state.stageIndex} revealed={state.revealed} />
-        {state.revealed && question.answer && (
+        {state.phase === "ready" ? <div className="ready-cover"><Eye size={56} /><strong>문제가 아직 공개되지 않았습니다</strong><span>시작하면 문제와 타이머가 함께 표시됩니다.</span></div> :
+          <QuestionContent question={question} stageIndex={state.stageIndex} phase={state.phase} requiredCount={settings.requiredCount ?? 3} />}
+        {state.phase === "revealed" && question.answer && (
           <div className="answer-reveal"><span>정답</span><strong>{question.answer}</strong></div>
         )}
+        {state.phase === "revealed" && <ContentCredits question={question} />}
       </section>
 
-      {state.pendingDecision && (
-        <aside className="decision-bar" aria-label="오답 처리 선택">
-          <strong>다음 행동을 선택하세요</strong>
-          {state.teams.filter((team) => team.id !== state.currentTeamId).map((team) => (
-            <ActionButton key={team.id} onClick={() => dispatch({ type: "STEAL", teamId: team.id })}>{team.name} 기회</ActionButton>
-          ))}
-          <ActionButton onClick={() => dispatch({ type: "RETRY" })}>재도전</ActionButton>
-          <ActionButton onClick={() => dispatch({ type: "REVEAL" })}>문제 종료</ActionButton>
+      {settings.answerMode === "direct_input" && state.phase === "active" && question.answer && <DirectAnswerPanel key={`${question.id}-${state.stageIndex}`} question={question} />}
+
+      {state.phase === "attempt" && attemptingTeam && (
+        <aside className="decision-bar" aria-label="도전 판정">
+          <strong>{attemptingTeam.name}의 답을 판정하세요</strong>
+          <ActionButton variant="success" onClick={() => dispatch({ type: "CORRECT", teamId: attemptingTeam.id })}>정답</ActionButton>
+          <ActionButton variant="danger" onClick={() => dispatch({ type: "WRONG", teamId: attemptingTeam.id })}>오답 · 현재 단계 잠금</ActionButton>
         </aside>
       )}
 
@@ -533,31 +695,25 @@ function GamePlayScreen() {
           <button className="icon-button icon-button--large" title="라운드 종료" aria-label="라운드 종료" onClick={() => dispatch({ type: "END" })}><Flag size={25} /></button>
         </div>
         <div className="control-group control-group--center">
-          {state.timerStatus !== "running" ? (
-            <ActionButton variant="primary" icon={<Play size={24} />} disabled={state.timerStatus === "expired"} onClick={() => dispatch({ type: state.timerStatus === "paused" ? "RESUME" : "START" })}>시작</ActionButton>
-          ) : (
-            <ActionButton icon={<Pause size={24} />} onClick={() => dispatch({ type: "PAUSE" })}>일시정지</ActionButton>
-          )}
-          {!state.revealed && (
-            <>
-              {(game.engine === "speed" ? [currentTeam] : state.teams).map((team) => (
-                <button key={team.id} className="team-correct-button" style={{ backgroundColor: team.color }} onClick={() => dispatch({ type: "CORRECT", teamId: team.id })}>
-                  <Check size={25} /><span>{team.name} 정답</span>
-                </button>
-              ))}
-              <ActionButton variant="danger" icon={<X size={24} />} onClick={() => dispatch({ type: "WRONG" })}>오답</ActionButton>
-            </>
-          )}
-          {game.engine === "progressive" && !state.revealed && (
-            <ActionButton icon={<SkipForward size={23} />} onClick={() => dispatch({ type: "NEXT_STAGE" })}>다음 힌트</ActionButton>
-          )}
-          {state.settingsByGame[game.id].allowPass && !state.revealed && (
-            <ActionButton icon={<SkipForward size={23} />} onClick={() => dispatch({ type: "PASS" })}>패스</ActionButton>
-          )}
-          {!state.revealed && game.engine !== "speed" && (
-            <ActionButton icon={<Eye size={23} />} onClick={() => dispatch({ type: "REVEAL" })}>정답 공개</ActionButton>
-          )}
-          {state.revealed && (
+          {state.phase === "ready" && <ActionButton variant="primary" icon={<Play size={24} />} onClick={() => dispatch({ type: "START" })}>문제 공개 · 시작</ActionButton>}
+          {canPause && <ActionButton icon={<Pause size={24} />} onClick={() => dispatch({ type: "PAUSE" })}>일시정지</ActionButton>}
+          {canResume && state.phase !== "attempt" && <ActionButton variant="primary" icon={<Play size={24} />} onClick={() => dispatch({ type: "RESUME" })}>재개</ActionButton>}
+          {state.phase === "active" && game.engine === "speed" && <>
+            <button className="team-correct-button" style={{ backgroundColor: currentTeam.color }} onClick={() => dispatch({ type: "CORRECT", teamId: currentTeam.id })}><Check size={25} /><span>{currentTeam.name} 정답</span></button>
+            {settings.allowPass && <ActionButton icon={<SkipForward size={23} />} onClick={() => dispatch({ type: "PASS" })}>패스</ActionButton>}
+          </>}
+          {(state.phase === "active" || state.phase === "attempt") && game.engine === "standard" && <>
+            <button className="team-correct-button" style={{ backgroundColor: currentTeam.color }} onClick={() => dispatch({ type: "CORRECT", teamId: currentTeam.id })}><Check size={25} /><span>{currentTeam.name} 성공</span></button>
+            <ActionButton variant="danger" icon={<X size={24} />} onClick={() => dispatch({ type: "WRONG", teamId: currentTeam.id })}>실패</ActionButton>
+          </>}
+          {state.phase === "active" && game.engine === "progressive" && <>
+            {state.teams.map((team) => <button key={team.id} disabled={state.lockedTeamIds.includes(team.id)} className="team-correct-button"
+              style={{ backgroundColor: team.color }} onClick={() => dispatch({ type: "ATTEMPT", teamId: team.id })}>
+              <span>{state.lockedTeamIds.includes(team.id) ? `${team.name} 잠김` : `${team.name} 도전`}</span></button>)}
+            {(settings.stageCount ?? settings.stageScores?.length ?? 1) > 1 && <ActionButton icon={<SkipForward size={23} />} onClick={() => dispatch({ type: "NEXT_STAGE" })}>다음 단계</ActionButton>}
+          </>}
+          {state.phase !== "ready" && state.phase !== "revealed" && game.engine !== "speed" && <ActionButton icon={<Eye size={23} />} onClick={() => dispatch({ type: "REVEAL" })}>정답 공개</ActionButton>}
+          {state.phase === "revealed" && (
             <ActionButton variant="primary" icon={<SkipForward size={23} />} onClick={() => dispatch({ type: "NEXT" })}>다음 문제</ActionButton>
           )}
         </div>
@@ -567,7 +723,8 @@ function GamePlayScreen() {
   );
 }
 
-function QuestionContent({ question, stageIndex, revealed }: { question: MvpQuestion; stageIndex: number; revealed: boolean }) {
+function QuestionContent({ question, stageIndex, phase, requiredCount }: { question: MvpQuestion; stageIndex: number; phase: string; requiredCount: number }) {
+  const revealed = phase === "revealed";
   if (question.gameType === "person_quiz") {
     return (
       <div className="person-question">
@@ -576,22 +733,199 @@ function QuestionContent({ question, stageIndex, revealed }: { question: MvpQues
     );
   }
   if (question.gameType === "charades") {
-    return <div className="word-question"><span>제시어</span><strong>{question.answer}</strong></div>;
+    if (phase === "active") return <div className="ready-cover"><Users size={56} /><strong>설명 중</strong><span>제시어는 숨겨졌습니다. 몸짓만 사용하세요.</span></div>;
+    return <div className="word-question"><span>{revealed ? "정답" : "설명자만 확인하세요"}</span><strong>{question.answer}</strong></div>;
   }
   if (question.gameType === "four_syllable") {
     return <div className="word-question"><span>뒤의 두 글자는?</span><strong>{question.metadata.prompt}<i>··</i></strong>{revealed && <small>{question.metadata.fullAnswer}</small>}</div>;
   }
   if (question.gameType === "three_in_time") {
-    return <div className="prompt-question"><span>{question.metadata.requiredCount}개 말하기</span><strong>{question.metadata.prompt}</strong></div>;
+    return <div className="prompt-question"><span>{requiredCount}개 말하기</span><strong>{question.metadata.prompt}</strong>{revealed && <small>예시: {question.metadata.examples.join(", ")} · {question.metadata.judgingNotes}</small>}</div>;
   }
   if (question.gameType === "progressive_hint") {
     return <ol className="hint-list">{question.metadata.hints.slice(0, stageIndex + 1).map((hint, index) => <li key={hint}><span>힌트 {index + 1}</span><strong>{hint}</strong></li>)}</ol>;
   }
   if (question.gameType === "football_career") {
-    const indexes = question.metadata.revealStages[Math.min(stageIndex, question.metadata.revealStages.length - 1)] ?? [];
-    return <div className="career-path">{indexes.map((index, itemIndex) => <div key={`${index}-${itemIndex}`}><span>{itemIndex + 1}</span><strong>{question.metadata.career[index]?.club}</strong></div>)}</div>;
+    return <div className="career-path">{question.metadata.career.map((entry, itemIndex) => <div key={`${entry.order}-${entry.club}`}><span>{itemIndex + 1}</span><strong>{entry.club}</strong></div>)}</div>;
   }
   return null;
+}
+
+function HostConsolePortal() {
+  const popupRef = useRef<Window | null>(null);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+
+  const openConsole = () => {
+    if (popupRef.current && !popupRef.current.closed) {
+      popupRef.current.focus();
+      return;
+    }
+    const popup = window.open("", "quiz-host-console", "popup,width=760,height=900");
+    if (!popup) {
+      setPopupBlocked(true);
+      return;
+    }
+    popup.document.head.replaceChildren();
+    popup.document.body.replaceChildren();
+    popup.document.title = "사회자 콘솔 · 모두의 퀴즈룸";
+    const viewport = popup.document.createElement("meta");
+    viewport.name = "viewport";
+    viewport.content = "width=device-width, initial-scale=1";
+    popup.document.head.appendChild(viewport);
+    document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
+      popup.document.head.appendChild(node.cloneNode(true));
+    });
+    const root = popup.document.createElement("div");
+    root.id = "host-console-root";
+    popup.document.body.appendChild(root);
+    popupRef.current = popup;
+    setPortalRoot(root);
+    setPopupBlocked(false);
+    popup.addEventListener("beforeunload", () => {
+      popupRef.current = null;
+      setPortalRoot(null);
+    }, { once: true });
+  };
+
+  useEffect(() => () => popupRef.current?.close(), []);
+
+  return <>
+    <button className="icon-button" title="사회자 화면 열기" aria-label="사회자 화면 열기" onClick={openConsole}><MonitorUp size={22} /></button>
+    {popupBlocked && <span className="popup-warning" role="alert">팝업을 허용해 주세요.</span>}
+    {portalRoot && createPortal(<HostConsole />, portalRoot)}
+  </>;
+}
+
+function DirectAnswerPanel({ question }: { question: MvpQuestion }) {
+  const state = useSessionStore();
+  const dispatch = useSessionStore((store) => store.dispatch);
+  const game = state.currentGameId ? gameRegistry[state.currentGameId] : null;
+  const [teamId, setTeamId] = useState(state.currentTeamId);
+  const [guess, setGuess] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const availableTeams = state.teams.filter((team) => !state.lockedTeamIds.includes(team.id));
+
+  if (!game) return null;
+  const effectiveTeamId = availableTeams.some((team) => team.id === teamId) ? teamId : (availableTeams[0]?.id ?? "");
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!guess.trim() || !effectiveTeamId) return;
+    if (answerMatchesQuestion(question, guess)) {
+      setFeedback("정답입니다.");
+      dispatch({ type: "CORRECT", teamId: effectiveTeamId });
+      return;
+    }
+    setGuess("");
+    if (game.engine === "progressive") {
+      dispatch({ type: "WRONG", teamId: effectiveTeamId });
+      setFeedback("오답입니다. 이 문제 또는 현재 단계에서 잠겼습니다.");
+    } else {
+      setFeedback("오답입니다. 다시 입력하세요.");
+    }
+  };
+
+  return <form className="direct-answer-panel" onSubmit={submit}>
+    <div className="direct-answer-heading"><strong>정답 직접 입력</strong><span>입력한 답은 정답 공개 전까지 화면에만 잠시 표시됩니다.</span></div>
+    {game.engine === "progressive" ? <label><span>도전 팀</span><select aria-label="도전 팀" value={effectiveTeamId} onChange={(event) => setTeamId(event.target.value)}>
+      {state.teams.map((team) => <option key={team.id} value={team.id} disabled={state.lockedTeamIds.includes(team.id)}>{team.name}{state.lockedTeamIds.includes(team.id) ? " (잠김)" : ""}</option>)}
+    </select></label> : <span className="direct-team-name">{state.teams.find((team) => team.id === state.currentTeamId)?.name} 답변</span>}
+    <input aria-label="정답 입력" value={guess} onChange={(event) => { setGuess(event.target.value); setFeedback(""); }} autoComplete="off" autoFocus placeholder="정답을 입력하세요" />
+    <ActionButton variant="primary" icon={<Check size={21} />} type="submit">제출</ActionButton>
+    <span className={feedback.startsWith("정답입니다") ? "answer-feedback correct" : "answer-feedback"} aria-live="polite">{feedback}</span>
+  </form>;
+}
+
+function supportsDirectInput(gameId: MvpGameType): boolean {
+  return gameId !== "three_in_time";
+}
+
+function HostConsole() {
+  const state = useSessionStore();
+  const dispatch = useSessionStore((store) => store.dispatch);
+  const game = state.currentGameId ? gameRegistry[state.currentGameId] : null;
+  const question = questions.find((item) => item.id === state.questionQueue[state.questionIndex]);
+  if (!game || !question) return <main className="host-console-page"><p>진행 중인 문제가 없습니다.</p></main>;
+
+  const settings = state.settingsByGame[game.id];
+  const currentTeam = state.teams.find((team) => team.id === state.currentTeamId) ?? state.teams[0];
+  const attemptingTeam = state.teams.find((team) => team.id === state.attemptingTeamId);
+  const isPhaseClock = state.phase === "preview" || game.engine !== "speed";
+  const timerStatus = isPhaseClock ? state.phaseTimerStatus : state.roundTimerStatus;
+  const remainingMs = isPhaseClock ? state.phaseRemainingMs : state.roundRemainingMs;
+  const canPause = state.roundTimerStatus === "running" || state.phaseTimerStatus === "running";
+  const canResume = state.roundTimerStatus === "paused" || state.phaseTimerStatus === "paused";
+
+  return <main className="host-console-page">
+    <header className="host-console-heading">
+      <div><span>사회자 콘솔</span><h1>{game.label}</h1></div>
+      <div className={remainingMs <= 10_000 ? "host-console-timer urgent" : "host-console-timer"}>
+        <span>{timerStatus === "expired" ? "종료" : "남은 시간"}</span>
+        <strong>{formatTime(Math.ceil(remainingMs / 1000))}</strong>
+      </div>
+    </header>
+    <div className="host-console-status">
+      <span>문제 {state.questionIndex + 1} / {state.questionQueue.length}</span>
+      <span>상태: {phaseLabel(state.phase)}</span>
+      {game.engine === "progressive" && (settings.stageCount ?? 1) > 1 && <span>단계 {state.stageIndex + 1}</span>}
+    </div>
+    <HostAnswerGuide question={question} requiredCount={settings.requiredCount ?? 3} />
+    {attemptingTeam && <section className="host-attempt"><strong>{attemptingTeam.name} 답변 판정</strong>
+      <ActionButton variant="success" onClick={() => dispatch({ type: "CORRECT", teamId: attemptingTeam.id })}>정답</ActionButton>
+      <ActionButton variant="danger" onClick={() => dispatch({ type: "WRONG", teamId: attemptingTeam.id })}>오답 · 잠금</ActionButton>
+    </section>}
+    <section className="host-console-actions" aria-label="사회자 조작">
+      {state.phase === "ready" && <ActionButton variant="primary" icon={<Play size={20} />} onClick={() => dispatch({ type: "START" })}>문제 공개 · 시작</ActionButton>}
+      {canPause && <ActionButton icon={<Pause size={20} />} onClick={() => dispatch({ type: "PAUSE" })}>일시정지</ActionButton>}
+      {canResume && state.phase !== "attempt" && <ActionButton variant="primary" icon={<Play size={20} />} onClick={() => dispatch({ type: "RESUME" })}>재개</ActionButton>}
+      {state.phase === "active" && game.engine === "speed" && <>
+        <ActionButton variant="success" onClick={() => dispatch({ type: "CORRECT", teamId: currentTeam.id })}>{currentTeam.name} 정답</ActionButton>
+        {settings.allowPass && <ActionButton onClick={() => dispatch({ type: "PASS" })}>패스</ActionButton>}
+      </>}
+      {(state.phase === "active" || state.phase === "attempt") && game.engine === "standard" && <>
+        <ActionButton variant="success" onClick={() => dispatch({ type: "CORRECT", teamId: currentTeam.id })}>{currentTeam.name} 성공</ActionButton>
+        <ActionButton variant="danger" onClick={() => dispatch({ type: "WRONG", teamId: currentTeam.id })}>실패</ActionButton>
+      </>}
+      {state.phase === "active" && game.engine === "progressive" && state.teams.map((team) => <ActionButton key={team.id} disabled={state.lockedTeamIds.includes(team.id)} onClick={() => dispatch({ type: "ATTEMPT", teamId: team.id })}>{state.lockedTeamIds.includes(team.id) ? `${team.name} 잠김` : `${team.name} 도전`}</ActionButton>)}
+      {state.phase === "active" && game.engine === "progressive" && (settings.stageCount ?? settings.stageScores?.length ?? 1) > 1 && <ActionButton onClick={() => dispatch({ type: "NEXT_STAGE" })}>다음 단계</ActionButton>}
+      {state.phase !== "ready" && state.phase !== "revealed" && game.engine !== "speed" && <ActionButton icon={<Eye size={20} />} onClick={() => dispatch({ type: "REVEAL" })}>정답 공개</ActionButton>}
+      {state.phase === "revealed" && <ActionButton variant="primary" onClick={() => dispatch({ type: "NEXT" })}>다음 문제</ActionButton>}
+      <ActionButton icon={<RotateCcw size={20} />} disabled={state.history.length === 0} onClick={() => dispatch({ type: "UNDO" })}>실행 취소</ActionButton>
+      <ActionButton icon={<Flag size={20} />} onClick={() => dispatch({ type: "END" })}>라운드 종료</ActionButton>
+    </section>
+  </main>;
+}
+
+function HostAnswerGuide({ question, requiredCount }: { question: MvpQuestion; requiredCount: number }) {
+  const aliases = question.acceptedAnswers?.filter((answer) => answer !== question.answer) ?? [];
+  return <section className="host-answer-guide">
+    <span className="host-only-label">참가자 화면에 표시되지 않는 정보</span>
+    {question.gameType === "three_in_time" ? <>
+      <p className="host-prompt">{question.metadata.prompt}</p>
+      <h2>유효 답 {requiredCount}개 필요</h2>
+      <div><strong>판정 예시</strong><ul>{question.metadata.examples.map((example) => <li key={example}>{example}</li>)}</ul></div>
+      <p className="judging-note"><strong>판정 기준</strong> {question.metadata.judgingNotes}</p>
+    </> : <>
+      <span>정답</span><h2>{question.answer}</h2>
+      {aliases.length > 0 && <p><strong>허용 답안</strong> {aliases.join(" · ")}</p>}
+      {question.gameType === "four_syllable" && <p><strong>완성어</strong> {question.metadata.fullAnswer}</p>}
+      {question.gameType === "progressive_hint" && <div><strong>전체 힌트</strong><ol>{question.metadata.hints.map((hint) => <li key={hint}>{hint}</li>)}</ol></div>}
+      {question.gameType === "football_career" && <div><strong>전체 경력</strong><ol>{question.metadata.career.map((entry) => <li key={`${entry.order}-${entry.club}`}>{entry.club}</li>)}</ol></div>}
+    </>}
+  </section>;
+}
+
+function phaseLabel(phase: string): string {
+  return ({ ready: "준비", preview: "설명자 확인", active: "진행", attempt: "판정", revealed: "정답 공개" } as Record<string, string>)[phase] ?? phase;
+}
+
+function ContentCredits({ question }: { question: MvpQuestion }) {
+  if (!question.attribution && !question.sources?.length && !question.source) return null;
+  return <details className="content-credits"><summary>콘텐츠 출처·라이선스</summary>
+    {question.attribution && <p>사진: {question.attribution.author} · <a href={question.attribution.sourceUrl} target="_blank" rel="noreferrer">원본</a> · {question.attribution.licenseUrl ? <a href={question.attribution.licenseUrl} target="_blank" rel="noreferrer">{question.attribution.license}</a> : <span>{question.attribution.license}</span>} · {question.attribution.modified}</p>}
+    {question.sources?.map((source) => <p key={source.url}>{source.publisher}: <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> ({source.accessedAt})</p>)}
+    {!question.sources?.length && question.source && <p><a href={question.source} target="_blank" rel="noreferrer">문항 출처</a></p>}
+  </details>;
 }
 
 function AssetImage({ src, alt, fallback }: { src?: string | null; alt: string; fallback: string }) {

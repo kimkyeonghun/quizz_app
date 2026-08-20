@@ -12,7 +12,7 @@ describe("mvpQuestionSchema", () => {
       difficulty: 1,
       enabled: true,
       verified: true,
-      metadata: { hints: ["첫 힌트", "둘째 힌트"] },
+      metadata: { hints: ["첫 힌트", "둘째 힌트", "셋째 힌트"] },
     });
     expect(result.success).toBe(true);
   });
