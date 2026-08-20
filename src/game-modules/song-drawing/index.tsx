@@ -8,7 +8,7 @@ export { songDrawingQuestionSchema, type SongDrawingQuestion } from "./schema";
 type DrawingRuntime = typeof noopRuntime;
 type DrawingAction = { type: "RESET" };
 
-function SongDrawingView({ question, stageIndex }: GameQuestionProps<SongDrawingQuestion, DrawingRuntime, DrawingAction>) {
+function SongDrawingView({ question, stageIndex, revealed }: GameQuestionProps<SongDrawingQuestion, DrawingRuntime, DrawingAction>) {
   const asset = `${import.meta.env.BASE_URL}${question.asset.replace(/^\//, "")}`;
   return (
     <MediaFrame>
@@ -23,6 +23,7 @@ function SongDrawingView({ question, stageIndex }: GameQuestionProps<SongDrawing
           </div>
         ))}
       </div>
+      {revealed && <p className={styles.revealMeta}>{question.metadata.artist}</p>}
     </MediaFrame>
   );
 }

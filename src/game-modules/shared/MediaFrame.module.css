@@ -8,6 +8,24 @@
   border: 1px solid #52514d;
   border-radius: 6px;
   color: #1a1a1a;
+  position: relative;
+}
+
+.assetProbe {
+  display: none;
+}
+
+.revealMeta {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  padding: 9px 13px;
+  color: #fff;
+  background: #20201ecc;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .sprite {

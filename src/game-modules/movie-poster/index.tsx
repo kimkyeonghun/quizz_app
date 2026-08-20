@@ -2,6 +2,7 @@
 import type { GameModule, NewGameSettings } from "../contracts";
 import { keepRuntime, noopRuntime } from "../contracts";
 import { MediaFrame, VisualAsset } from "../shared/VisualAsset";
+import styles from "../shared/MediaFrame.module.css";
 import { moviePosterQuestionSchema, type MoviePosterQuestion } from "./schema";
 export { moviePosterQuestionSchema, type MoviePosterQuestion } from "./schema";
 type MovieRuntime = typeof noopRuntime;
@@ -15,6 +16,7 @@ function MoviePosterView({ question, revealed }: { question: MoviePosterQuestion
         symbolId={question.metadata.symbolId}
         alt={revealed ? `${question.answer} 포스터` : "제목이 가려진 영화 포스터"}
       />
+      {revealed && <p className={styles.revealMeta}>{question.metadata.releaseYear} · {question.metadata.country}</p>}
     </MediaFrame>
   );
 }

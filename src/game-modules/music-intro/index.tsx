@@ -13,7 +13,7 @@ function assetUrl(asset: string): string {
   return `${import.meta.env.BASE_URL}${asset.replace(/^\//, "")}`;
 }
 
-function MusicIntroView({ question, stageIndex }: GameQuestionProps<MusicIntroQuestion, MusicRuntime, MusicAction>) {
+function MusicIntroView({ question, stageIndex, revealed }: GameQuestionProps<MusicIntroQuestion, MusicRuntime, MusicAction>) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
@@ -57,7 +57,7 @@ function MusicIntroView({ question, stageIndex }: GameQuestionProps<MusicIntroQu
 
   return (
     <section className={styles.audioPanel} style={{ "--module-accent": "#db9e28" } as React.CSSProperties}>
-      <p className={styles.audioTitle}>전주 {duration}초</p>
+      <p className={styles.audioTitle}>{revealed ? question.metadata.artist : `전주 ${duration}초`}</p>
       <div className={styles.waveform} aria-hidden="true">
         {[26, 55, 82, 44, 68, 92, 36, 74, 50, 86, 42, 64, 30, 72, 48, 88].map((height, index) => (
           <span key={index} style={{ "--bar-height": `${height}%` } as React.CSSProperties} />

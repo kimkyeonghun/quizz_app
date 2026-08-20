@@ -29,9 +29,12 @@ export function VisualAsset({ asset, alt, symbolId, viewBox = "0 0 100 100" }: V
   if (symbolId) {
     const url = assetUrl(asset);
     return (
-      <svg className={styles.sprite} viewBox={viewBox} role="img" aria-label={alt}>
-        <use href={`${url}#${symbolId}`} />
-      </svg>
+      <>
+        <img className={styles.assetProbe} src={url} alt="" aria-hidden="true" onError={() => setFailed(true)} />
+        <svg className={styles.sprite} viewBox={viewBox} role="img" aria-label={alt}>
+          <use href={`${url}#${symbolId}`} />
+        </svg>
+      </>
     );
   }
 
