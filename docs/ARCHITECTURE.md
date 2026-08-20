@@ -5,6 +5,8 @@
 - `src/config`: 게임 레지스트리와 JSON 기본 설정 검증
 - `src/data`: Zod 문제 스키마, 자동 로더, 필터와 셔플
 - `src/store`: 세션·팀·점수·타이머·진행·Undo 상태
+- `src/game-modules`: 신규 미디어 게임의 스키마·화면·런타임 모듈
+- `src/adapters`: 신규 모듈을 현재 게임 레지스트리와 세션 엔진에 연결
 - `src/App.tsx`: 화면 흐름과 게임별 표시 어댑터
 - `data`: 런타임 문제 데이터
 - `scripts`: 데이터 검증과 현황 보고
@@ -18,3 +20,5 @@
 사회자 콘솔은 별도 브라우저 팝업에 React portal로 렌더링됩니다. 같은 Zustand 저장소를 사용하므로 참가자 화면과 별도 동기화 서버 없이 정답·타이머·판정 상태 및 조작이 즉시 공유됩니다.
 
 `answerMode: "direct_input"`에서는 참가자 화면에 답안 폼을 렌더링하고 정규화된 `answer`·`acceptedAnswers`와 비교합니다. 자동 판정이 가능한 닫힌 정답형 게임에만 제공하며, 진행형 오답은 기존 `LOCK_CURRENT_STAGE` 액션 흐름을 재사용합니다.
+
+신규 모듈은 자체 Zod 스키마와 `QuestionView`를 가지지만 별도 세션 엔진을 만들지 않습니다. `playableGameRegistry`가 기존 6개 정의와 신규 모듈 정의를 합치고, 현재 Zustand의 단계 타이머·팀 잠금·Undo·영속 상태를 그대로 사용합니다. `zoom_image`는 과거 세션 복원용으로 등록만 유지하고 선택 화면에서는 숨기며, `taboo`는 기능 플래그가 켜질 때만 노출합니다.

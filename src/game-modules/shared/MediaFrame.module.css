@@ -1,0 +1,249 @@
+.frame {
+  width: min(920px, 88vw);
+  height: min(60vh, 600px);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #f7f6f1;
+  border: 1px solid #52514d;
+  border-radius: 6px;
+  color: #1a1a1a;
+  position: relative;
+}
+
+.assetProbe {
+  display: none;
+}
+
+.revealMeta {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  padding: 9px 13px;
+  color: #fff;
+  background: #20201ecc;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sprite {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.posterSurface {
+  max-width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #181818;
+}
+
+.posterSurface .image,
+.posterSurface .sprite {
+  position: absolute;
+  inset: 0;
+}
+
+.posterMaskBlur,
+.posterMaskBlank {
+  position: absolute;
+  z-index: 1;
+  display: block;
+}
+
+.posterMaskBlur {
+  background: #18181873;
+  backdrop-filter: blur(14px);
+}
+
+.posterMaskBlank {
+  background: #181818;
+}
+
+.fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  padding: 32px;
+  color: #5f5d58;
+  text-align: center;
+}
+
+.fallback strong {
+  color: #262522;
+  font-size: 24px;
+}
+
+.fallback span {
+  font-size: 14px;
+}
+
+.audioPanel {
+  width: min(720px, 86vw);
+  display: grid;
+  justify-items: center;
+  gap: 28px;
+  padding: 44px;
+  color: #fff;
+  background: #242422;
+  border-top: 5px solid var(--module-accent, #f2c94c);
+}
+
+.audioTitle {
+  margin: 0;
+  color: #aaa79f;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.waveform {
+  width: min(560px, 72vw);
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.waveform span {
+  width: 8px;
+  height: var(--bar-height);
+  background: var(--module-accent, #f2c94c);
+  border-radius: 2px;
+}
+
+.mediaControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconButton {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #171717;
+  background: var(--module-accent, #f2c94c);
+  border: 0;
+  border-radius: 50%;
+}
+
+.volume {
+  width: 150px;
+  accent-color: var(--module-accent, #f2c94c);
+}
+
+.error {
+  color: #ff8a78;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.drawingGrid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: #fff;
+}
+
+.drawingCell {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  border-right: 1px solid #d8d6cf;
+}
+
+.drawingCell:last-child {
+  border-right: 0;
+}
+
+.drawingCell svg {
+  width: 100%;
+  height: 100%;
+}
+
+.drawingLocked {
+  color: #9a9790;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.tabooCard {
+  width: min(760px, 86vw);
+  min-height: 390px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 24px;
+  padding: 44px;
+  color: #1a1a1a;
+  background: #fff;
+  border-top: 7px solid var(--module-accent, #d94f45);
+}
+
+.tabooCard h2 {
+  margin: 0;
+  font-size: 54px;
+}
+
+.forbiddenWords {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.forbiddenWords li {
+  padding: 10px 14px;
+  color: #8e241a;
+  background: #fff0ed;
+  border: 1px solid #e2a49c;
+  border-radius: 4px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.tabooHidden {
+  color: #696761;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.tabooToggle {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid #aaa79f;
+  border-radius: 5px;
+  background: #fff;
+  font-weight: 800;
+}
+
+@media (max-width: 700px) {
+  .frame { width: 92vw; height: min(54vh, 480px); }
+  .audioPanel, .tabooCard { width: 92vw; padding: 28px 20px; }
+  .tabooCard h2 { font-size: 40px; }
+  .drawingGrid { grid-template-columns: 1fr; }
+  .drawingCell { min-height: 150px; border-right: 0; border-bottom: 1px solid #d8d6cf; }
+}

@@ -42,8 +42,14 @@ const defaultConfigSchema = z.object({
 }).strict().superRefine((config, context) => {
   const hint = config.games.progressive_hint;
   const career = config.games.football_career;
+  const music = config.games.music_intro;
+  const logo = config.games.logo_quiz;
+  const zoom = config.games.zoom_image;
   if (hint.stageCount !== 3 || hint.stageScores?.length !== 3) context.addIssue({ code: "custom", path: ["games", "progressive_hint"], message: "3단 힌트는 단계와 점수가 정확히 3개여야 합니다." });
   if (career.stageCount !== 1 || career.stageScores?.length !== 1) context.addIssue({ code: "custom", path: ["games", "football_career"], message: "선수 커리어는 전체 경력을 공개하는 단일 단계여야 합니다." });
+  if (music.stageCount !== 3 || music.stageScores?.length !== 3) context.addIssue({ code: "custom", path: ["games", "music_intro"], message: "음악 전주는 단계와 점수가 정확히 3개여야 합니다." });
+  if (logo.stageCount !== 3 || logo.stageScores?.length !== 3) context.addIssue({ code: "custom", path: ["games", "logo_quiz"], message: "로고 확대는 단계와 점수가 정확히 3개여야 합니다." });
+  if (zoom.stageCount !== 3 || zoom.stageScores?.length !== 3) context.addIssue({ code: "custom", path: ["games", "zoom_image"], message: "기존 이미지 확대 세션은 단계와 점수가 정확히 3개여야 합니다." });
   const three = config.games.three_in_time;
   if ((three.questionDurationSec ?? 0) < 3 || (three.questionDurationSec ?? 0) > 15) context.addIssue({ code: "custom", path: ["games", "three_in_time", "questionDurationSec"], message: "3~15초 범위여야 합니다." });
   if ((three.requiredCount ?? 0) < 2 || (three.requiredCount ?? 0) > 5) context.addIssue({ code: "custom", path: ["games", "three_in_time", "requiredCount"], message: "2~5개 범위여야 합니다." });

@@ -3,15 +3,50 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
 import { answerMatchesQuestion } from "./domain/answerMatching";
+import { questions } from "./data/questions";
 import { useSessionStore } from "./store/sessionStore";
 
 describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
+    useSessionStore.getState().newSession();
     useSessionStore.setState({ screen: "home", teams: [
       { id: "team-1", name: "A팀", color: "#e14d3a", score: 0 },
       { id: "team-2", name: "B팀", color: "#3973c6", score: 0 },
     ] });
+  });
+
+  it("통합된 신규 게임 4개를 표시하고 기존 이미지 확대와 설명 금지어는 숨긴다", () => {
+    useSessionStore.setState({ screen: "game_select" });
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "로고 확대 퀴즈" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "영화 포스터" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "이미지 확대" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "음악 전주" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "노래 그림" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "설명 금지어" })).not.toBeInTheDocument();
+  });
+
+  it("신규 게임의 안내와 샘플 문제 화면을 렌더링한다", () => {
+    useSessionStore.setState({ currentGameId: "logo_quiz", screen: "game_intro" });
+    const { rerender } = render(<App />);
+    expect(screen.getByRole("heading", { name: "로고 확대 퀴즈" })).toBeInTheDocument();
+    expect(screen.getByText(/로고의 좁은 영역부터/)).toBeInTheDocument();
+
+    useSessionStore.setState({
+      screen: "game_play",
+      questionQueue: ["logo-001"],
+      questionIndex: 0,
+      questionStageCounts: { "logo-001": 3 },
+      currentTeamId: "team-1",
+      phase: "active",
+      phaseTimerStatus: "idle",
+      phaseRemainingMs: 20_000,
+      moduleRuntime: {},
+    });
+    rerender(<App />);
+    expect(screen.getByRole("img", { name: "기술 로고 1단계" })).toBeInTheDocument();
+    expect(screen.queryByText("노바")).not.toBeInTheDocument();
   });
 
   it("새 게임에서 팀 설정 화면으로 이동한다", async () => {
@@ -56,7 +91,7 @@ describe("App", () => {
     render(<App />);
     await user.click(screen.getByRole("button", { name: "문제 데이터 관리" }));
     expect(screen.getByRole("heading", { name: "문제 데이터 관리" })).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "데이터 현황" })).getAllByText("684")).toHaveLength(2);
+    expect(within(screen.getByRole("region", { name: "데이터 현황" })).getAllByText(String(questions.length))).toHaveLength(2);
     await user.click(screen.getByRole("button", { name: "몸으로 말해요 100문항" }));
     await user.type(screen.getByLabelText("문항 검색"), "볼링");
     expect(screen.getByRole("region", { name: "몸으로 말해요 문제 목록" })).toHaveTextContent("볼링");

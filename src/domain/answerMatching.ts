@@ -1,6 +1,6 @@
-import type { MvpQuestion } from "./types";
+import type { PlayableQuestion } from "./types";
 
-export function answerMatchesQuestion(question: MvpQuestion, guess: string): boolean {
+export function answerMatchesQuestion(question: PlayableQuestion, guess: string): boolean {
   if (!question.answer) return false;
   const accepted = [question.answer, ...(question.acceptedAnswers ?? [])];
   if (question.gameType === "four_syllable") accepted.push(question.metadata.fullAnswer);

@@ -111,6 +111,31 @@ describe("sessionStore 고도화 규칙", () => {
     expect(useSessionStore.getState().phase).toBe("revealed");
   });
 
+  it("로고 확대는 문제별 3단계를 현재 타이머와 Undo 구조로 진행한다", () => {
+    const store = useSessionStore.getState();
+    store.selectGame("logo_quiz");
+    store.startRound(["logo-1", "logo-2", "logo-3", "logo-4", "logo-5"], { "logo-1": 3 });
+    store.dispatch({ type: "START" });
+    useSessionStore.getState().dispatch({ type: "NEXT_STAGE" });
+    expect(useSessionStore.getState().stageIndex).toBe(1);
+    useSessionStore.getState().dispatch({ type: "ATTEMPT", teamId: "team-1" });
+    useSessionStore.getState().dispatch({ type: "CORRECT", teamId: "team-1" });
+    expect(useSessionStore.getState().teams[0].score).toBe(2);
+    useSessionStore.getState().dispatch({ type: "UNDO" });
+    expect(useSessionStore.getState().teams[0].score).toBe(0);
+    expect(useSessionStore.getState().phase).toBe("attempt");
+  });
+
+  it("설명 금지어 모듈 상태도 Undo로 복원한다", () => {
+    const store = useSessionStore.getState();
+    store.selectGame("taboo");
+    store.startRound(["taboo-1"]);
+    store.dispatchModuleAction({ type: "HIDE_FORBIDDEN" });
+    expect(useSessionStore.getState().moduleRuntime).toEqual({ forbiddenWordsVisible: false });
+    useSessionStore.getState().dispatch({ type: "UNDO" });
+    expect(useSessionStore.getState().moduleRuntime).toEqual({ forbiddenWordsVisible: true });
+  });
+
   it("기존 영속 상태의 점수와 사용 기록을 보존하며 새 판정 모드 기본값을 마이그레이션한다", async () => {
     const migrate = useSessionStore.persist.getOptions().migrate!;
     const migrated = await migrate({
