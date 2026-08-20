@@ -1,10 +1,10 @@
-import { z } from "zod";
-import { logoQuizModule, logoQuizQuestionSchema, type LogoQuizQuestion } from "./logo-quiz";
-import { moviePosterModule, moviePosterQuestionSchema, type MoviePosterQuestion } from "./movie-poster";
-import { musicIntroModule, musicIntroQuestionSchema, type MusicIntroQuestion } from "./music-intro";
-import { songDrawingModule, songDrawingQuestionSchema, type SongDrawingQuestion } from "./song-drawing";
-import { tabooModule, tabooQuestionSchema, type TabooQuestion } from "./taboo";
-import { zoomImageModule, zoomImageQuestionSchema, type ZoomImageQuestion } from "./zoom-image";
+import { logoQuizModule } from "./logo-quiz";
+import { moviePosterModule } from "./movie-poster";
+import { musicIntroModule } from "./music-intro";
+import { songDrawingModule } from "./song-drawing";
+import { tabooModule } from "./taboo";
+import { zoomImageModule } from "./zoom-image";
+export { newGameQuestionFileSchema, newGameQuestionSchema, type NewGameQuestion } from "./questionSchemas";
 
 export const newGameModules = {
   music_intro: musicIntroModule,
@@ -16,25 +16,6 @@ export const newGameModules = {
 } as const;
 
 export type NewGameModule = (typeof newGameModules)[keyof typeof newGameModules];
-export type NewGameQuestion =
-  | MusicIntroQuestion
-  | ZoomImageQuestion
-  | LogoQuizQuestion
-  | MoviePosterQuestion
-  | SongDrawingQuestion
-  | TabooQuestion;
-
-export const newGameQuestionSchema = z.discriminatedUnion("gameType", [
-  musicIntroQuestionSchema,
-  zoomImageQuestionSchema,
-  logoQuizQuestionSchema,
-  moviePosterQuestionSchema,
-  songDrawingQuestionSchema,
-  tabooQuestionSchema,
-]);
-
-export const newGameQuestionFileSchema = z.array(newGameQuestionSchema);
-
 export function isNewGameId(value: string): value is keyof typeof newGameModules {
   return value in newGameModules;
 }

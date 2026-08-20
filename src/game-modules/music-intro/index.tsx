@@ -1,29 +1,11 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2 } from "lucide-react";
-import { z } from "zod";
 import type { GameModule, GameQuestionProps, NewGameSettings } from "../contracts";
 import { keepRuntime, noopRuntime } from "../contracts";
-import { commonQuestionShape, mediaCreditShape } from "../schema";
 import styles from "../shared/MediaFrame.module.css";
-
-export const musicIntroQuestionSchema = z
-  .object({
-    ...commonQuestionShape,
-    gameType: z.literal("music_intro"),
-    answer: z.string().min(1),
-    asset: z.string().min(1),
-    metadata: z
-      .object({
-        artist: z.string().min(1),
-        clipStartSec: z.number().min(0),
-        clipDurationsSec: z.array(z.number().positive()).min(1),
-        ...mediaCreditShape,
-      })
-      .strict(),
-  })
-  .strict();
-
-export type MusicIntroQuestion = z.infer<typeof musicIntroQuestionSchema>;
+import { musicIntroQuestionSchema, type MusicIntroQuestion } from "./schema";
+export { musicIntroQuestionSchema, type MusicIntroQuestion } from "./schema";
 type MusicRuntime = typeof noopRuntime;
 type MusicAction = { type: "RESET" };
 

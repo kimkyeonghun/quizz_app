@@ -1,26 +1,9 @@
-import { z } from "zod";
+/* eslint-disable react-refresh/only-export-components */
 import type { GameModule, NewGameSettings } from "../contracts";
 import { keepRuntime, noopRuntime } from "../contracts";
-import { commonQuestionShape, mediaCreditShape } from "../schema";
 import { MediaFrame, VisualAsset } from "../shared/VisualAsset";
-
-export const logoQuizQuestionSchema = z
-  .object({
-    ...commonQuestionShape,
-    gameType: z.literal("logo_quiz"),
-    answer: z.string().min(1),
-    asset: z.string().min(1),
-    metadata: z
-      .object({
-        symbolId: z.string().min(1).optional(),
-        brandCategory: z.string().min(1),
-        ...mediaCreditShape,
-      })
-      .strict(),
-  })
-  .strict();
-
-export type LogoQuizQuestion = z.infer<typeof logoQuizQuestionSchema>;
+import { logoQuizQuestionSchema, type LogoQuizQuestion } from "./schema";
+export { logoQuizQuestionSchema, type LogoQuizQuestion } from "./schema";
 type LogoRuntime = typeof noopRuntime;
 type LogoAction = { type: "RESET" };
 

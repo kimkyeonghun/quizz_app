@@ -1,27 +1,9 @@
-import { z } from "zod";
+/* eslint-disable react-refresh/only-export-components */
 import type { GameModule, NewGameSettings } from "../contracts";
 import { keepRuntime, noopRuntime } from "../contracts";
-import { commonQuestionShape, mediaCreditShape, positiveInteger } from "../schema";
 import { MediaFrame, VisualAsset } from "../shared/VisualAsset";
-
-export const moviePosterQuestionSchema = z
-  .object({
-    ...commonQuestionShape,
-    gameType: z.literal("movie_poster"),
-    answer: z.string().min(1),
-    asset: z.string().min(1),
-    metadata: z
-      .object({
-        symbolId: z.string().min(1).optional(),
-        releaseYear: positiveInteger.min(1888).max(2200),
-        country: z.string().min(1),
-        ...mediaCreditShape,
-      })
-      .strict(),
-  })
-  .strict();
-
-export type MoviePosterQuestion = z.infer<typeof moviePosterQuestionSchema>;
+import { moviePosterQuestionSchema, type MoviePosterQuestion } from "./schema";
+export { moviePosterQuestionSchema, type MoviePosterQuestion } from "./schema";
 type MovieRuntime = typeof noopRuntime;
 type MovieAction = { type: "RESET" };
 

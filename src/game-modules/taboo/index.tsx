@@ -1,28 +1,9 @@
+/* eslint-disable react-refresh/only-export-components */
 import { Eye, EyeOff } from "lucide-react";
-import { z } from "zod";
 import type { GameModule, GameQuestionProps, NewGameSettings } from "../contracts";
-import { commonQuestionShape } from "../schema";
 import styles from "../shared/MediaFrame.module.css";
-
-export const tabooQuestionSchema = z
-  .object({
-    ...commonQuestionShape,
-    gameType: z.literal("taboo"),
-    answer: z.string().min(1),
-    asset: z.null().optional(),
-    metadata: z
-      .object({
-        forbiddenWords: z.array(z.string().min(1)).min(4),
-      })
-      .strict(),
-  })
-  .strict()
-  .refine((question) => !question.metadata.forbiddenWords.some((word) => word.normalize("NFC").toLocaleLowerCase("ko-KR") === question.answer.normalize("NFC").toLocaleLowerCase("ko-KR")), {
-    path: ["metadata", "forbiddenWords"],
-    message: "정답은 금지어 목록에 포함할 수 없습니다.",
-  });
-
-export type TabooQuestion = z.infer<typeof tabooQuestionSchema>;
+import { tabooQuestionSchema, type TabooQuestion } from "./schema";
+export { tabooQuestionSchema, type TabooQuestion } from "./schema";
 export interface TabooRuntime {
   forbiddenWordsVisible: boolean;
 }

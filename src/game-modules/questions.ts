@@ -1,5 +1,5 @@
 import type { NewGameId } from "./contracts";
-import { newGameQuestionSchema, type NewGameQuestion } from "./registry";
+import { newGameQuestionSchema, type NewGameQuestion } from "./questionSchemas";
 
 const modules = import.meta.glob("/data/{music-intro,zoom-image,logo-quiz,movie-poster,song-drawing,taboo}/*.json", {
   eager: true,

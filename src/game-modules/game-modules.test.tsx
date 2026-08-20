@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { newGameModules, newGameQuestionSchema } from "./registry";
+import { newGameModules } from "./registry";
+import { newGameQuestionSchema } from "./questionSchemas";
 import { newGameQuestionLoadErrors, newGameQuestions } from "./questions";
 import { reduceTabooRuntime, tabooModule } from "./taboo";
-import { zoomImageQuestionSchema } from "./zoom-image";
+import { zoomImageQuestionSchema } from "./zoom-image/schema";
 
 const shared = {
   acceptedAnswers: ["테스트"],

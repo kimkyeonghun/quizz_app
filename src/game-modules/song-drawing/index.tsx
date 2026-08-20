@@ -1,27 +1,10 @@
-import { z } from "zod";
+/* eslint-disable react-refresh/only-export-components */
 import type { GameModule, GameQuestionProps, NewGameSettings } from "../contracts";
 import { keepRuntime, noopRuntime } from "../contracts";
-import { commonQuestionShape, mediaCreditShape } from "../schema";
 import styles from "../shared/MediaFrame.module.css";
 import { MediaFrame } from "../shared/VisualAsset";
-
-export const songDrawingQuestionSchema = z
-  .object({
-    ...commonQuestionShape,
-    gameType: z.literal("song_drawing"),
-    answer: z.string().min(1),
-    asset: z.string().min(1),
-    metadata: z
-      .object({
-        artist: z.string().min(1),
-        stageSymbolIds: z.array(z.string().min(1)).min(2),
-        ...mediaCreditShape,
-      })
-      .strict(),
-  })
-  .strict();
-
-export type SongDrawingQuestion = z.infer<typeof songDrawingQuestionSchema>;
+import { songDrawingQuestionSchema, type SongDrawingQuestion } from "./schema";
+export { songDrawingQuestionSchema, type SongDrawingQuestion } from "./schema";
 type DrawingRuntime = typeof noopRuntime;
 type DrawingAction = { type: "RESET" };
 
