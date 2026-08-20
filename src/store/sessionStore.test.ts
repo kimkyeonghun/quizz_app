@@ -40,4 +40,25 @@ describe("sessionStore", () => {
     expect(useSessionStore.getState().timerStatus).toBe("expired");
     expect(useSessionStore.getState().screen).toBe("round_result");
   });
+
+  it("문제 데이터의 단계 수를 사용해 마지막 힌트에서 종료한다", () => {
+    const store = useSessionStore.getState();
+    store.selectGame("zoom_image");
+    store.startRound(["zoom-test"], { "zoom-test": 2 });
+    store.dispatch({ type: "NEXT_STAGE" });
+    expect(useSessionStore.getState().stageIndex).toBe(1);
+    useSessionStore.getState().dispatch({ type: "NEXT_STAGE" });
+    expect(useSessionStore.getState().stageIndex).toBe(1);
+    expect(useSessionStore.getState().revealed).toBe(true);
+  });
+
+  it("설명 금지어 공개 상태를 Undo로 복원한다", () => {
+    const store = useSessionStore.getState();
+    store.selectGame("taboo");
+    store.startRound(["taboo-test"]);
+    store.dispatchModuleAction({ type: "HIDE_FORBIDDEN" });
+    expect(useSessionStore.getState().moduleRuntime).toEqual({ forbiddenWordsVisible: false });
+    useSessionStore.getState().dispatch({ type: "UNDO" });
+    expect(useSessionStore.getState().moduleRuntime).toEqual({ forbiddenWordsVisible: true });
+  });
 });
