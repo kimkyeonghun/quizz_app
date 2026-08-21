@@ -48,7 +48,7 @@ export const moviePosterModule: GameModule<MoviePosterQuestion, NewGameSettings,
   label: "영화 포스터",
   shortDescription: "제목이 가려진 포스터만 보고 영화 제목을 맞힙니다.",
   accent: "#2d756f",
-  engine: "media",
+  engine: "standard",
   questionSchema: moviePosterQuestionSchema,
   defaultSettings: {
     answerMode: "host",

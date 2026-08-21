@@ -2,7 +2,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const sampleRate = 22_050;
-const durationSec = 12;
+const argument = (name: string) => {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+};
+const durationSec = Number(argument("--duration") ?? 12);
 const noteSets = [
   [261.63, 329.63, 392, 523.25],
   [293.66, 369.99, 440, 587.33],
@@ -42,7 +46,8 @@ function createWave(notes: number[]): Buffer {
   return buffer;
 }
 
-const outputDirectory = resolve(import.meta.dirname, "../public/assets/new-games/audio");
+const outputDirectory = resolve(process.cwd(), argument("--output") ?? "public/assets/new-games/audio");
+const outputCount = Math.min(noteSets.length, Number(argument("--count") ?? noteSets.length));
 mkdirSync(outputDirectory, { recursive: true });
-noteSets.forEach((notes, index) => writeFileSync(join(outputDirectory, `tone-${index + 1}.wav`), createWave(notes)));
-console.log(`Generated ${noteSets.length} original WAV samples in ${outputDirectory}`);
+noteSets.slice(0, outputCount).forEach((notes, index) => writeFileSync(join(outputDirectory, `tone-${index + 1}.wav`), createWave(notes)));
+console.log(`Generated ${outputCount} original WAV samples in ${outputDirectory}`);

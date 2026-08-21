@@ -55,6 +55,13 @@ function MusicIntroView({ question, stageIndex, revealed }: GameQuestionProps<Mu
     }
   };
 
+  const retry = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setError("");
+    audio.load();
+  };
+
   return (
     <section className={styles.audioPanel} style={{ "--module-accent": "#db9e28" } as React.CSSProperties}>
       <p className={styles.audioTitle}>{revealed ? question.metadata.artist : `전주 ${duration}초`}</p>
@@ -84,7 +91,7 @@ function MusicIntroView({ question, stageIndex, revealed }: GameQuestionProps<Mu
         <Volume2 aria-hidden="true" />
         <input className={styles.volume} type="range" min="0" max="1" step="0.05" value={volume} aria-label="음량" onChange={(event) => setVolume(Number(event.target.value))} />
       </div>
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      {error && <div className={styles.error} role="alert"><span>{error}</span><button type="button" onClick={retry}>다시 시도</button></div>}
     </section>
   );
 }
@@ -94,7 +101,7 @@ export const musicIntroModule: GameModule<MusicIntroQuestion, NewGameSettings, M
   label: "음악 전주",
   shortDescription: "짧게 재생되는 전주를 듣고 곡 제목을 맞힙니다.",
   accent: "#db9e28",
-  engine: "media",
+  engine: "progressive",
   questionSchema: musicIntroQuestionSchema,
   defaultSettings: {
     answerMode: "host",

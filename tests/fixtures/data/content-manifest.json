@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-21T00:49:30.708Z",
+  "files": [
+    {
+      "path": "data/fixture-questions.json",
+      "sha256": "40a8cefe6f2065f8d84a1f2407b0a8fb2fb155db69e54b7db52daa80fe974809",
+      "questionCount": 22
+    }
+  ],
+  "assets": [
+    {
+      "path": "public/assets/fixture-tone.wav",
+      "sha256": "c229733fb48810144cc0dc4a6e452f922db2971b37a4a42c0a0d53e6b958f090",
+      "bytes": 176444
+    },
+    {
+      "path": "public/assets/fixture-visual.svg",
+      "sha256": "0eb27e3395417d85f5942259ac6bce80fbcaed683083cd0fb15bf189d8089891",
+      "bytes": 337
+    }
+  ]
+}

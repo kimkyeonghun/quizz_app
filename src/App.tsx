@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -25,8 +25,10 @@ import {
 } from "lucide-react";
 import { availableGameDefinitions, getPlayableGameDefinition, playableGameRegistry } from "./adapters/newGames";
 import { getNewGameStageCount, NewGameQuestionContent } from "./adapters/NewGameQuestionContent";
+import { ContentReviewPreview } from "./components/ContentReviewPreview";
 import { filterQuestions } from "./data/filter";
-import { questionLoadErrors, questions, questionsForGame } from "./data/questions";
+import { preflightQuestions, type MediaPreflightFailure } from "./data/mediaPreflight";
+import { questionBundle, questionLoadErrors, questionLoadIssues, questions, questionsForGame } from "./data/questions";
 import type {
   FilterSettings,
   GameSettings,
@@ -40,6 +42,7 @@ import { useGameTimer } from "./hooks/useGameTimer";
 import { useSessionStore } from "./store/sessionStore";
 
 const teamColorOptions = ["#e14d3a", "#3973c6", "#1e8f65", "#e29b23", "#8d5bb7"];
+const DataAdminScreen = lazy(() => import("./screens/DataAdminScreen"));
 
 function isMvpQuestion(question: PlayableQuestion): question is MvpQuestion {
   return (MVP_GAME_TYPES as readonly string[]).includes(question.gameType);
@@ -69,7 +72,7 @@ function App() {
   return (
     <div className="app-shell">
       {screen === "home" && <HomeScreen />}
-      {screen === "data_admin" && <DataAdminScreen />}
+      {screen === "data_admin" && <Suspense fallback={<main className="admin-screen"><p>데이터 화면을 불러오는 중입니다.</p></main>}><DataAdminScreen /></Suspense>}
       {screen === "session_setup" && <SessionSetupScreen />}
       {screen === "game_select" && <GameSelectScreen />}
       {screen === "game_intro" && <GameIntroScreen />}
@@ -119,7 +122,7 @@ function HomeScreen() {
   );
 }
 
-function DataAdminScreen() {
+export function LegacyDataAdminScreen() {
   const setScreen = useSessionStore((state) => state.setScreen);
   const [gameId, setGameId] = useState<GameType>("person_quiz");
   const [query, setQuery] = useState("");
@@ -163,6 +166,22 @@ function DataAdminScreen() {
       <div><span>로컬 전용</span><strong>{totalPrivate}</strong></div>
       <div className={questionLoadErrors.length ? "has-errors" : ""}><span>로드 오류</span><strong>{questionLoadErrors.length}</strong></div>
     </section>
+
+    <p className="admin-profile">콘텐츠 프로필: <strong>{questionBundle.profile}</strong></p>
+    {questionLoadIssues.length > 0 && (
+      <section className="content-issue-list" aria-label="콘텐츠 로드 오류">
+        <h2>콘텐츠 로드 오류</h2>
+        {questionLoadIssues.map((issue, index) => (
+          <article key={`${issue.file}-${issue.index}-${issue.path}-${index}`}>
+            <strong>{issue.code}</strong>
+            <span>{issue.file}{issue.index === undefined ? "" : `[${issue.index}]`}</span>
+            {issue.questionId && <span>ID: {issue.questionId}</span>}
+            {issue.path && <code>{issue.path}</code>}
+            <p>{issue.message}</p>
+          </article>
+        ))}
+      </section>
+    )}
 
     <nav className="admin-game-tabs" aria-label="게임별 데이터">
       {Object.values(playableGameRegistry).map((game) => {
@@ -222,6 +241,7 @@ function AdminQuestionRow({ question, number }: { question: PlayableQuestion; nu
         {question.source && <p><a href={question.source} target="_blank" rel="noreferrer">문항 출처</a></p>}
         {!question.source && (!isMvpQuestion(question) || (!question.attribution && !question.sources?.length)) && <p className="admin-muted">등록된 외부 출처가 없는 자체 작성 문항입니다.</p>}
       </section>
+      <ContentReviewPreview question={question} />
     </div>
   </details>;
 }
@@ -429,6 +449,8 @@ function GameIntroScreen() {
 }
 
 function GameSetupScreen() {
+  const [checkingMedia, setCheckingMedia] = useState(false);
+  const [mediaFailures, setMediaFailures] = useState<MediaPreflightFailure[]>([]);
   const currentGameId = useSessionStore((state) => state.currentGameId);
   const teams = useSessionStore((state) => state.teams);
   const currentTeamId = useSessionStore((state) => state.currentTeamId);
@@ -451,6 +473,21 @@ function GameSetupScreen() {
   const requiredQuestions = game.engine === "speed" ? 1 : (settings.roundQuestionCount ?? (game.engine === "standard" ? 10 : 5));
   const insufficientQuestions = queue.length < requiredQuestions;
   const invalidSettings = !settingsAreValid(currentGameId, settings);
+  const beginRound = async () => {
+    setCheckingMedia(true);
+    setMediaFailures([]);
+    const result = await preflightQuestions(queue);
+    setCheckingMedia(false);
+    const playable = result.playable;
+    if (playable.length < requiredQuestions) {
+      setMediaFailures(result.failures);
+      return;
+    }
+    startRound(
+      playable.map((question) => question.id),
+      Object.fromEntries(playable.map((question) => [question.id, getNewGameStageCount(question)])),
+    );
+  };
 
   return (
     <ScreenFrame title={game.label} subtitle={game.shortDescription}>
@@ -481,6 +518,12 @@ function GameSetupScreen() {
             <p className="inline-error">라운드에 필요한 {requiredQuestions}문항보다 적습니다. 필터 또는 사용 기록을 조정하세요.</p>
           )}
           {invalidSettings && <p className="inline-error">고급 설정 값이 허용 범위를 벗어났습니다.</p>}
+          {mediaFailures.length > 0 && (
+            <div className="inline-error" role="alert">
+              <strong>사용 가능한 미디어가 부족합니다.</strong>
+              <span>{mediaFailures.map((failure) => failure.questionId).join(", ")}</span>
+            </div>
+          )}
           <button className="text-button" onClick={clearUsedQuestions}>사용 기록 초기화</button>
         </div>
       </section>
@@ -490,13 +533,10 @@ function GameSetupScreen() {
         <ActionButton
           variant="primary"
           icon={<Play size={20} />}
-          disabled={insufficientQuestions || invalidSettings}
-          onClick={() => startRound(
-            queue.map((question) => question.id),
-            Object.fromEntries(queue.map((question) => [question.id, getNewGameStageCount(question)])),
-          )}
+          disabled={insufficientQuestions || invalidSettings || checkingMedia}
+          onClick={() => void beginRound()}
         >
-          라운드 시작
+          {checkingMedia ? "미디어 확인 중" : "라운드 시작"}
         </ActionButton>
       </footer>
     </ScreenFrame>

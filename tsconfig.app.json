@@ -12,6 +12,9 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "paths": {
+      "#question-source": ["./src/data/contentSources/runtime.ts"]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",

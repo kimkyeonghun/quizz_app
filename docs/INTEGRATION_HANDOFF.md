@@ -7,6 +7,8 @@
 - `zoom_image`는 기존 세션 호환용으로만 유지하고, `taboo`는 기능 플래그 뒤에 유지했습니다.
 - 신규 모듈도 `ready → preview/active → attempt → revealed`, 사회자 콘솔, 직접 입력, 단계 타이머, 팀 잠금, Undo, 영속 상태 v6을 사용합니다.
 - 회사 브랜치의 JSON과 샘플 미디어는 로컬에는 보존하되 Git 인덱스에서는 제거했습니다.
+- 코드 환경은 `tests/fixtures`와 Vite `fixture` 모드로 운영 데이터 없이 검증하며, GitHub Actions는 `verify:code`와 동일한 경계를 사용합니다.
+- 메인 환경의 최종 순서는 콘텐츠 생성·권리 검수 → `npm run manifest:content` → `npm run verify:content` → `npm run build:production`입니다.
 - 아래의 원래 인계 내용은 통합 판단의 근거로 보존합니다.
 
 기준일: 2026-08-20

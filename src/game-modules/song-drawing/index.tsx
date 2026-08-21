@@ -29,7 +29,7 @@ export const songDrawingModule: GameModule<SongDrawingQuestion, NewGameSettings,
   label: "노래 그림",
   shortDescription: "K-pop 노래 가사를 해석한 한 장의 그림으로 곡명을 맞힙니다.",
   accent: "#ad5e8d",
-  engine: "media",
+  engine: "standard",
   questionSchema: songDrawingQuestionSchema,
   defaultSettings: {
     answerMode: "host",

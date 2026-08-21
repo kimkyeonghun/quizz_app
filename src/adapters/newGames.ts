@@ -4,15 +4,6 @@ import type { GameDefinition, GameSettings, GameType } from "../domain/types";
 import type { NewGameId } from "../game-modules/contracts";
 import { newGameModules } from "../game-modules/registry";
 
-const engineByGame: Record<NewGameId, GameDefinition["engine"]> = {
-  music_intro: "progressive",
-  zoom_image: "progressive",
-  logo_quiz: "progressive",
-  movie_poster: "standard",
-  song_drawing: "standard",
-  taboo: "speed",
-};
-
 export const newGameDefinitions = Object.fromEntries(
   Object.values(newGameModules).map((module) => [
     module.id,
@@ -21,7 +12,7 @@ export const newGameDefinitions = Object.fromEntries(
       label: module.label,
       shortDescription: module.shortDescription,
       accent: module.accent,
-      engine: engineByGame[module.id],
+      engine: module.engine,
       defaultSettings: defaultConfig.games[module.id] as GameSettings,
       guide: module.instructions,
     } satisfies GameDefinition,

@@ -153,4 +153,18 @@ describe("sessionStore 고도화 규칙", () => {
     expect(migrated.settingsByGame?.person_quiz.answerMode).toBe("host");
     expect(migrated.filter?.includePrivateQuestions).toBe(true);
   });
+
+  it("v5 플레이 화면을 설정 화면으로 복구하고 손상된 저장 값은 안전한 기본값으로 대체한다", async () => {
+    const migrate = useSessionStore.persist.getOptions().migrate!;
+    const restored = await migrate({ screen: "game_play", currentGameId: "logo_quiz", selectedGameIds: ["logo_quiz", "zoom_image"] }, 5) as Partial<ReturnType<typeof useSessionStore.getState>>;
+    expect(restored.screen).toBe("game_setup");
+    expect(restored.currentGameId).toBe("logo_quiz");
+    expect(restored.selectedGameIds).toEqual(["logo_quiz"]);
+
+    const corrupted = await migrate({ teams: "broken", selectedGameIds: "broken", usedQuestionIds: ["ok", 7], roundNumber: -2 }, 5) as Partial<ReturnType<typeof useSessionStore.getState>>;
+    expect(corrupted.screen).toBe("home");
+    expect(corrupted.teams).toHaveLength(2);
+    expect(corrupted.usedQuestionIds).toEqual(["ok"]);
+    expect(corrupted.roundNumber).toBe(1);
+  });
 });

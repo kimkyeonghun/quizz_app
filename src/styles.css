@@ -166,6 +166,16 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .admin-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; padding-top: 22px; }
 .admin-pagination button { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid #bdbab2; border-radius: 4px; background: white; }
 .admin-pagination span { min-width: 72px; font-size: 13px; font-weight: 900; text-align: center; }
+.admin-profile { margin: 10px 0 20px; color: var(--muted); }
+.content-issue-list { margin: 18px 0; padding: 20px; border: 2px solid #b6382d; background: #fff4f2; }
+.content-issue-list article { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; padding: 10px 0; border-top: 1px solid #e3b7b0; }
+.content-issue-list article:first-of-type { border-top: 0; }
+.content-issue-list article p { grid-column: 1 / -1; margin: 0; }
+.content-review-preview { grid-column: 1 / -1; padding-top: 18px; border-top: 1px solid var(--line); }
+.content-review-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 14px; }
+.content-review-controls label { display: flex; align-items: center; gap: 8px; }
+.content-review-controls input[type="range"] { width: 180px; }
+.content-review-media { max-width: 560px; margin: 0 auto; color: white; }
 
 .play-screen { min-height: 100vh; height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; background: #121212; color: white; overflow: hidden; }
 .play-header { min-height: 86px; display: grid; grid-template-columns: minmax(190px, 1fr) auto auto 48px 48px; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid #363633; }

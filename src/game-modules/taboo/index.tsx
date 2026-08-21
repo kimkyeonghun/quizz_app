@@ -42,7 +42,7 @@ export const tabooModule: GameModule<TabooQuestion, NewGameSettings, TabooRuntim
   label: "설명 금지어",
   shortDescription: "지정된 금지어를 쓰지 않고 제시어를 설명합니다.",
   accent: "#d94f45",
-  engine: "standard",
+  engine: "speed",
   questionSchema: tabooQuestionSchema,
   defaultSettings: {
     answerMode: "host",

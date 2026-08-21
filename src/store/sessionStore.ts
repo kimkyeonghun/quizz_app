@@ -304,10 +304,17 @@ export const useSessionStore = create<SessionStore>()(
     {
       name: "party-quiz-session", version: 6,
       migrate: (persisted) => {
-        const previous = (persisted ?? {}) as Partial<SessionStore>;
+        const previous = persisted && typeof persisted === "object" ? persisted as Partial<SessionStore> : {};
         const defaults = defaultSettings();
-        const teams = previous.teams ?? createTeams();
-        const settingsByGame = Object.fromEntries(Object.entries(defaults).map(([id, value]) => [id, { ...value, ...(previous.settingsByGame?.[id as GameType] ?? {}) }])) as Record<GameType, GameSettings>;
+        const validTeams = Array.isArray(previous.teams) && previous.teams.every((team) =>
+          team && typeof team.id === "string" && typeof team.name === "string" && typeof team.color === "string" && typeof team.score === "number")
+          ? previous.teams.slice(0, 4) : [];
+        const fallbackTeams = createTeams();
+        const teams = validTeams.length > 0
+          ? [...validTeams, ...fallbackTeams.filter((team) => !validTeams.some((existing) => existing.id === team.id))].slice(0, Math.max(2, validTeams.length))
+          : fallbackTeams;
+        const previousSettings = (previous.settingsByGame && typeof previous.settingsByGame === "object" ? previous.settingsByGame : {}) as Partial<Record<GameType, Partial<GameSettings>>>;
+        const settingsByGame = Object.fromEntries(Object.entries(defaults).map(([id, value]) => [id, { ...value, ...(previousSettings[id as GameType] ?? {}) }])) as Record<GameType, GameSettings>;
         settingsByGame.football_career = {
           ...settingsByGame.football_career,
           stageCount: 1,
@@ -317,16 +324,16 @@ export const useSessionStore = create<SessionStore>()(
         };
         return {
           sessionId: previous.sessionId ?? crypto.randomUUID(),
-          screen: previous.screen === "game_play" ? "game_setup" : (previous.screen ?? "home"),
+          screen: previous.screen === "game_play" ? "game_setup" : (["home", "data_admin", "session_setup", "game_select", "game_intro", "game_setup", "round_result", "scoreboard", "final_result"].includes(previous.screen ?? "") ? previous.screen : "home"),
           teams,
-          selectedGameIds: (previous.selectedGameIds ?? availableGameDefinitions.map((game) => game.id))
+          selectedGameIds: (Array.isArray(previous.selectedGameIds) ? previous.selectedGameIds : availableGameDefinitions.map((game) => game.id))
             .filter((gameId) => availableGameDefinitions.some((game) => game.id === gameId)),
-          currentGameId: previous.currentGameId && playableGameRegistry[previous.currentGameId] ? previous.currentGameId : null,
-          currentTeamId: previous.currentTeamId ?? teams[0].id,
+          currentGameId: typeof previous.currentGameId === "string" && playableGameRegistry[previous.currentGameId] ? previous.currentGameId : null,
+          currentTeamId: typeof previous.currentTeamId === "string" && teams.some((team) => team.id === previous.currentTeamId) ? previous.currentTeamId : teams[0].id,
           settingsByGame,
-          filter: { ...defaultFilter, ...(previous.filter ?? {}) },
-          roundNumber: previous.roundNumber ?? 1,
-          usedQuestionIds: previous.usedQuestionIds ?? [],
+          filter: { ...defaultFilter, ...(previous.filter && typeof previous.filter === "object" ? previous.filter : {}) },
+          roundNumber: typeof previous.roundNumber === "number" && previous.roundNumber > 0 ? previous.roundNumber : 1,
+          usedQuestionIds: Array.isArray(previous.usedQuestionIds) ? previous.usedQuestionIds.filter((id): id is string => typeof id === "string") : [],
         };
       },
       partialize: (state) => ({ sessionId: state.sessionId, screen: state.screen === "game_play" ? "game_setup" : state.screen,

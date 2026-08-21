@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import type { ZodType } from "zod";
+import type { EngineType } from "../domain/types";
 
 export const NEW_GAME_IDS = [
   "music_intro",
@@ -11,7 +12,7 @@ export const NEW_GAME_IDS = [
 ] as const;
 
 export type NewGameId = (typeof NEW_GAME_IDS)[number];
-export type NewGameEngine = "standard" | "progressive" | "media";
+export type NewGameEngine = EngineType;
 
 export interface NewGameQuestionBase {
   id: string;

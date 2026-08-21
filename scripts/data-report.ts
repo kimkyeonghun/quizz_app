@@ -1,7 +1,11 @@
 import { scanData } from "./data-utils";
 import type { PlayableQuestion } from "../src/domain/types";
+import type { ValidationProfile } from "../src/data/contentTypes";
+import { resolve } from "node:path";
 
-const result = scanData();
+const profile = (process.argv.find((argument) => argument.startsWith("--profile="))?.slice("--profile=".length) ?? "production") as ValidationProfile;
+const root = resolve(process.argv.find((argument) => argument.startsWith("--root="))?.slice("--root=".length) ?? ".");
+const result = await scanData({ root, profile });
 const byGame = result.questions.reduce<Record<string, PlayableQuestion[]>>((groups, question) => {
   (groups[question.gameType] ??= []).push(question);
   return groups;

@@ -35,9 +35,9 @@ describe("App", () => {
 
     useSessionStore.setState({
       screen: "game_play",
-      questionQueue: ["logo-001"],
+      questionQueue: ["fixture-logo-1"],
       questionIndex: 0,
-      questionStageCounts: { "logo-001": 3 },
+      questionStageCounts: { "fixture-logo-1": 3 },
       currentTeamId: "team-1",
       phase: "active",
       phaseTimerStatus: "idle",
@@ -45,8 +45,8 @@ describe("App", () => {
       moduleRuntime: {},
     });
     rerender(<App />);
-    expect(screen.getByRole("img", { name: "기술 로고 1단계" })).toBeInTheDocument();
-    expect(screen.queryByText("노바")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "테스트 로고 1단계" })).toBeInTheDocument();
+    expect(screen.queryByText("픽스처 로고")).not.toBeInTheDocument();
   });
 
   it("새 게임에서 팀 설정 화면으로 이동한다", async () => {
@@ -71,7 +71,7 @@ describe("App", () => {
     useSessionStore.setState({ screen: "game_select" });
     render(<App />);
     await user.click(screen.getByRole("button", { name: "문제 데이터 관리" }));
-    expect(screen.getByRole("heading", { name: "문제 데이터 관리" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "문제 데이터 관리" })).toBeInTheDocument();
   });
 
   it("직접 입력 답안을 공백과 기호 차이 없이 판정하고 네 글자 완성어도 인정한다", () => {
@@ -90,10 +90,11 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole("button", { name: "문제 데이터 관리" }));
-    expect(screen.getByRole("heading", { name: "문제 데이터 관리" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "문제 데이터 관리" })).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "데이터 현황" })).getAllByText(String(questions.length))).toHaveLength(2);
-    await user.click(screen.getByRole("button", { name: "몸으로 말해요 100문항" }));
-    await user.type(screen.getByLabelText("문항 검색"), "볼링");
-    expect(screen.getByRole("region", { name: "몸으로 말해요 문제 목록" })).toHaveTextContent("볼링");
+    const charadesCount = questions.filter((question) => question.gameType === "charades").length;
+    await user.click(screen.getByRole("button", { name: `몸으로 말해요 ${charadesCount}문항` }));
+    await user.type(screen.getByLabelText("문항 검색"), "박수치기");
+    expect(screen.getByRole("region", { name: "몸으로 말해요 문제 목록" })).toHaveTextContent("박수치기");
   });
 });

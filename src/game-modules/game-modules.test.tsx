@@ -31,16 +31,9 @@ describe("new game modules", () => {
   });
 
   it("loads every bundled sample with the strict module schemas", () => {
-    const bundledQuestions = newGameQuestions.filter((question) => !question.id.startsWith("local-"));
     expect(newGameQuestionLoadErrors).toEqual([]);
-    expect(bundledQuestions).toHaveLength(74);
-    expect(Object.fromEntries(Object.keys(newGameModules).map((gameId) => [gameId, bundledQuestions.filter((question) => question.gameType === gameId).length]))).toEqual({
-      music_intro: 6,
-      zoom_image: 12,
-      logo_quiz: 12,
-      movie_poster: 8,
-      song_drawing: 6,
-      taboo: 30,
+    Object.keys(newGameModules).forEach((gameId) => {
+      expect(newGameQuestions.filter((question) => question.gameType === gameId).length).toBeGreaterThan(0);
     });
   });
 
@@ -90,6 +83,26 @@ describe("new game modules", () => {
       },
     });
     expect(newGameModules.zoom_image.getStageCount(result, newGameModules.zoom_image.defaultSettings)).toBe(3);
+  });
+
+  it("renders music playback controls, stage duration, volume, and retry state", () => {
+    const question = newGameModules.music_intro.questionSchema.parse({
+      ...shared,
+      id: "music-controls-test",
+      gameType: "music_intro",
+      answer: "테스트 노래",
+      asset: "/assets/test.wav",
+      metadata: { artist: "가수", clipStartSec: 1, clipDurationsSec: [2, 4, 6], license: "ORIGINAL", credit: "fixture" },
+    });
+    const { container } = render(<newGameModules.music_intro.QuestionView question={question} stageIndex={1} revealed={false}
+      runtime={newGameModules.music_intro.initialRuntime} dispatch={() => undefined} />);
+    expect(screen.getByText("전주 4초")).toBeInTheDocument();
+    const volume = screen.getByLabelText("음량") as HTMLInputElement;
+    fireEvent.change(volume, { target: { value: "0.5" } });
+    expect(volume.value).toBe("0.5");
+    fireEvent.error(container.querySelector("audio")!);
+    expect(screen.getByRole("alert")).toHaveTextContent("오디오 파일을 불러올 수 없습니다.");
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
   });
 
   it("treats logo questions as three progressive crop stages", () => {
